@@ -1,0 +1,13 @@
+requests
+fastapi
+uvicorn
+python-dotenv
+pydantic
+pydantic-settings
+langchain
+openai
+sqlalchemy
+pymysql
+pytest
+pytest-mock
+cryptography

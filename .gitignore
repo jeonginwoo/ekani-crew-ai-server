@@ -1,0 +1,12 @@
+/.idea/
+/.code/
+/.env
+/.venv/
+/venv/
+docker-compose.yml
+__pycache__/
+app/__pycache__/
+tests/__pycache__/
+*.pyc
+.pytest_cache/
+test_converter_manual.py% 
