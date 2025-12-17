@@ -1,4 +1,4 @@
-# Plan: MBTI 관계 솔루션 서비스 (Phase 1 MVP)
+# Plan: MBTI 매칭 서비스 (4주 MVP)
 
 ## 아키텍처 개요
 
@@ -6,236 +6,289 @@
 
 ```
 app/
-├── user/                       # 사용자 도메인
-│   └── domain/                # User 엔티티 (id, email, mbti, gender)
-│
-├── auth/                       # 인증 도메인 (OAuth 전용)
-│   └── domain/                # OAuthIdentity (provider, provider_user_id, email)
-│
-├── consult/                    # 상담 도메인
-│   ├── domain/                 # 비즈니스 로직 (엔티티, 값 객체)
-│   ├── application/            # 유스케이스 레이어
-│   │   ├── port/              # 포트 인터페이스 (의존성 역전)
-│   │   └── use_case/          # 비즈니스 흐름 (유스케이스)
-│   ├── infrastructure/         # Secondary Adapter (Outbound)
-│   │   ├── repository/        # DB 구현체
-│   │   └── service/           # 외부 API 구현체 (OpenAI 등)
-│   └── adapter/               # Primary Adapter (Inbound)
-│       └── input/web/         # 웹 컨트롤러 (FastAPI)
-│           ├── request/       # 요청 DTO
-│           └── response/      # 응답 DTO
-│
-├── converter/                  # 변환기 도메인 (동일 구조)
-│   ├── domain/
-│   ├── application/
-│   ├── infrastructure/
-│   └── adapter/
-│
-└── shared/                     # 공통 값 객체
-    └── vo/                    # MBTI, Gender VO
+├── shared/                     # 공통 VO (MBTI, Gender) - 타입 정의만, 도메인 의존성 아님
+├── user/                       # 사용자 도메인 (MBTI 저장소)
+├── auth/                       # 인증 도메인 (OAuth)
+├── mbti_test/                  # AI MBTI 테스트 도메인 (NEW - 핵심!)
+├── matching/                   # 매칭 도메인 (NEW)
+├── chat/                       # 실시간 채팅 도메인 (NEW)
+├── referral/                   # 레퍼럴 도메인 (NEW)
+├── payment/                    # 결제 도메인 (NEW)
+├── consult/                    # 상담 도메인 (기존)
+└── converter/                  # 변환기 도메인 (기존)
 ```
 
-**핵사고날 의존성 흐름**:
+### 도메인 의존성
+
 ```
-Adapter (Web) → Application (UseCase) → Domain ← Infrastructure (DB, API)
-   [Inbound]        [Port]              [Core]      [Outbound]
+┌─────────────┐      ┌─────────────┐      ┌─────────────┐
+│  MBTI Test  │ ───→ │    User     │ ←─── │  Matching   │
+│  (도출)     │      │  (중심)     │      │  (매칭)     │
+└─────────────┘      └─────────────┘      └─────────────┘
+                           ↑
+          ┌────────────────┼────────────────┐
+          │                │                │
+    ┌─────┴─────┐    ┌─────┴─────┐    ┌─────┴─────┐
+    │   Chat    │    │ Referral  │    │  Payment  │
+    │  (대화)   │    │  (초대)   │    │  (결제)   │
+    └───────────┘    └───────────┘    └───────────┘
+```
+
+- **MBTI Test** → User.mbti 업데이트 (핵심 차별점!)
+- **Matching** → User.mbti 조회 (궁합/유사 매칭)
+- **Chat** → User 조회 + Match 결과로 채팅방 생성
+- **Referral** → User 조회 (초대자/피초대자)
+- **Payment** → User 조회 (매칭권 추가)
+- **MBTI Test ↔ Matching ↔ Chat**: 직접 의존 없음 (User 통해 느슨한 결합)
+
+---
+
+## 팀 구성 (5명 - 백엔드 집중)
+
+> **프론트엔드**: AI로 처리 (별도 인력 불필요)
+
+| 역할 | 인원 | 담당 | 비고 |
+|------|------|------|------|
+| **Team MBTI** | 2명 | mbti_test/ | |
+| ↳ Person A | 1명 | 사람이 만든 질문 | 일반 질문 + 돌발 질문 |
+| ↳ Person B | 1명 | AI 프롬프트 질문 | 일반 질문 + 돌발 질문 |
+| **Team Match** | 2명 | | |
+| ↳ Person C | 1명 | matching/ | 대기열, 매칭 로직 |
+| ↳ Person D | 1명 | chat/ | 채팅방, WebSocket |
+| **조장** | 1명 | 전체 서포트 | |
+| ↳ Person E | 1명 | payment/, referral/ | 남는 시간에 병목 해결 |
+
+### MBTI 테스트 (1개 페이지 - 채팅 형식)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              MBTI 테스트 (1개 페이지 - 채팅 형식)              │
+├─────────────────────────────────────────────────────────────┤
+│                     질문 구성 (2가지 소스)                    │
+├────────────────────────────┬────────────────────────────────┤
+│   Person A 담당             │   Person B 담당                │
+├────────────────────────────┼────────────────────────────────┤
+│ • 사람이 만든 일반 질문      │ • AI 프롬프트 일반 질문         │
+│ • 사람이 만든 돌발 질문      │ • AI 프롬프트 돌발 질문         │
+├────────────────────────────┴────────────────────────────────┤
+│  두 타입 질문이 섞여서 채팅 테스트 구성 → MBTI 도출 → 저장     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 병렬 작업 흐름
+
+```
+[Week 1-2] MVP
+Person A ───→ 사람이 만든 질문 (일반 + 돌발)
+Person B ───→ AI 프롬프트 질문 (일반 + 돌발)
+Person C ───→ MATCH-1 → MATCH-2 → MATCH-3
+Person D ───→ CHAT-1 → CHAT-2 → CHAT-3 → CHAT-4
+조장 ───────→ PAY-1 + 병목 지원
+
+[Week 3] 매칭 고도화
+Person A ───→ MATCH-4 (궁합 매칭)
+Person B ───→ MATCH-5 (유사 매칭)
+Person C,D ─→ TEST-1, TEST-2 (통합/부하 테스트)
+조장 ───────→ PAY-2 (결제 API)
+
+[Week 4] 그로스 해킹
+Person A,B ─→ REF-1~3 (레퍼럴)
+Person C,D ─→ 버그 픽스, UX 개선
+조장 ───────→ 결제 테스트 + 전체 조율
 ```
 
 ---
 
-## 설계 원칙 (Anti Over-Engineering)
+## 완료된 기능 (v1.0)
 
-> **YAGNI + KISS 우선**
+> Phase 0~2 완료 - 상담소 + 변환기 기능 구현 완료
 
-### ❌ 하지 말 것
-- **추상 포트가 구현체 1개일 때**: `OAuthProviderPort` → `GoogleOAuthProvider` 같은 불필요한 추상화
-- **복잡한 DI 셋업**: `register_provider()`, `set_use_case()` 같은 초기화 함수
-- **파라미터 릴레이**: 설정값을 계속 전달하는 대신 필요한 곳에서 직접 읽기
-
-### ✅ 해야 할 것
-- **Service 직접 사용**: `GoogleOAuthService`처럼 구체적인 서비스 클래스
-- **Router에서 직접 인스턴스화**: 필요한 곳에서 바로 생성
-- **설정은 config에서**: `get_settings()`로 필요할 때 읽기 (os.getenv 금지)
-- **추상화는 구현체가 2개 이상일 때만**: 실제 교체 가능성이 있을 때
-
-### 참고 패턴
-```python
-# Router에서 직접 생성
-service = GoogleOAuthService()
-
-# Service는 config에서 읽기
-from config.settings import get_settings
-settings = get_settings()
-client_id = settings.GOOGLE_CLIENT_ID
-```
+| Phase | 내용 | 상태 |
+|-------|------|------|
+| Phase 0 | Shared Domain (MBTI, Gender VO), User, Auth (OAuth) | ✅ |
+| Phase 1 | Consult (세션, AI 인사, 메시지, SSE, 턴 관리, 분석) | ✅ |
+| Phase 1 | Converter (메시지 변환, 3가지 톤, MBTI 맞춤) | ✅ |
+| Phase 2 | 분석 결과 DB 저장, 히스토리 API, 마이페이지 | ✅ |
 
 ---
 
-## Backlog
+## 신규 Backlog (4주 MVP)
 
-> **개발 전략**: Walking Skeleton + 수직 슬라이스 (Vertical Slice)
-> - 기초 빌딩 블록 먼저 구현 (의존성 높고 간단한 값 객체)
-> - 이후 기능별로 도메인→유스케이스→API 완전히 구현
-> - 각 Phase마다 작동하는 기능 완성
+### Week 1-2: MVP 출시
 
-### Phase 0: 기초 빌딩 블록 (Shared Domain + Auth)
+> **목표**: AI MBTI 테스트로 관심 유도 + 매칭/채팅으로 가치 검증
 
-#### Shared Domain (공통 값 객체)
+#### 🌟 MBTI Test Domain (핵심 - Team MBTI)
 
-- [x] `HAIS-1` [Shared] MBTI 값 객체 생성 - "INTJ" 형식의 유효한 4글자 조합만 허용
-- [x] `HAIS-2` [Shared] MBTI 유효성 검증 - "XXXX", "INXX" 등 유효하지 않은 값 거부
-- [x] `HAIS-3` [Shared] MBTI 차원별 조회 - `get_dimension(index)` 메서드로 E/I, S/N, T/F, J/P 개별 접근
-- [x] `HAIS-4` [Shared] Gender 값 객체 - MALE/FEMALE 생성 및 유효성 검증
-- [x] `HAIS-5` [Shared] UserProfile 값 객체 - Gender + MBTI 조합, 필수값 검증
+##### 공통 기반 (Person A, B 협업)
 
-#### User Domain (사용자 정보)
+- [ ] `MBTI-1` [MBTI] 채팅형 테스트 세션 기반 구조
+  - **📖 유저 스토리**: "사용자로서, 채팅 형식으로 MBTI 테스트를 하고 싶다"
+  - **Domain**: `MBTITestSession` (id, user_id, status, created_at)
+  - **Domain**: `MBTIMessage` (role, content, question_type, source)
+  - **Port**: `QuestionProviderPort` 인터페이스 (사람/AI 질문 제공)
+  - **API**: `POST /mbti-test/start` → 세션 시작, 첫 질문 반환
+  - **✅ 인수 조건**: 세션 생성, 질문 타입(일반/돌발) 구분
 
-- [x] `HAIS-6` [User] User 도메인 - id, email (핵심 유저 정보)
+##### Person A: 사람이 만든 질문
 
-#### Auth Domain (인증 시스템 🔐)
+- [ ] `MBTI-2` [MBTI] 사람이 만든 일반 질문 시스템
+  - **📖 유저 스토리**: "사용자로서, 정형화된 질문에 답하고 싶다"
+  - **Domain**: `HumanQuestion` (id, text, dimension, type='normal')
+  - **Adapter**: `HumanQuestionProvider` - 질문 DB에서 조회
+  - **✅ 인수 조건**: E/I, S/N, T/F, J/P 차원별 질문셋
 
-> **중요**: 모든 AI 세션은 로그인 필수. 대화 내용은 user_id와 연결하여 저장.
-> Auth 도메인은 순수 OAuth 인증만 담당, User 도메인과 분리됨.
+- [ ] `MBTI-3` [MBTI] 사람이 만든 돌발 질문 시스템
+  - **📖 유저 스토리**: "사용자로서, 예상치 못한 질문으로 깊이있는 답변을 하고 싶다"
+  - **Domain**: `HumanQuestion` (id, text, dimension, type='surprise')
+  - **✅ 인수 조건**: 간헐적 삽입, 정확도 향상용 질문셋
 
-- [x] `HAIS-7` [Auth] UserIdentity 도메인 - OAuth 연결 (여러 provider 지원)
+##### Person B: AI 프롬프트 질문
 
-#### Refactoring (도메인 구조 개선 - YAGNI 적용)
+- [ ] `MBTI-4` [MBTI] AI 프롬프트 일반 질문 시스템
+  - **📖 유저 스토리**: "사용자로서, AI가 맥락에 맞는 질문을 해주길 원한다"
+  - **Adapter**: `AIQuestionProvider` (gpt-4o-mini)
+  - **Prompt**: 대화 히스토리 기반 다음 질문 생성
+  - **✅ 인수 조건**: 맥락 기반 후속 질문, MBTI 차원 커버
 
-- [x] `HAIS-8` [Refactor] User 도메인 이동 및 확장
-  - auth/domain/user.py → user/domain/user.py 이동
-  - mbti: Optional[MBTI], gender: Optional[Gender] 추가
-  - UserProfile 삭제 (YAGNI - 불필요한 추상화 제거)
+- [ ] `MBTI-5` [MBTI] AI 프롬프트 돌발 질문 시스템
+  - **📖 유저 스토리**: "사용자로서, AI가 예상치 못한 질문으로 깊이 파악해주길 원한다"
+  - **Prompt**: 돌발 질문 생성 프롬프트
+  - **✅ 인수 조건**: 예상 못한 각도의 질문, 정확도 향상
 
-- [x] `HAIS-9` [Refactor] OAuthIdentity 분리
-  - UserIdentity → OAuthIdentity 리네임
-  - user_id 제거 (auth는 user를 모름)
-  - email 추가 (OAuth provider에서 받은 이메일)
-  - 순수 OAuth 정보만 담당
+##### 공통 결과 처리 (Person A, B 협업)
 
-- [x] `HAIS-10` [Auth] Google OAuth 로그인
-  - GoogleOAuthService: Google API 연동 (인증 URL, 토큰 교환, 프로필 조회)
-  - SessionRepository: 세션 저장/조회/삭제 (TTL 지원)
-  - google_oauth_router: /auth/google, /auth/google/callback, /auth/status, /auth/logout
-  - auth_dependency: 세션 검증, user_id 주입
+- [ ] `MBTI-6` [MBTI] 질문 응답 처리 및 대화 진행
+  - **📖 유저 스토리**: "사용자로서, 질문에 답하면 다음 질문이 나온다"
+  - **UseCase**: `AnswerMBTIQuestionUseCase`
+  - **로직**: 사람 질문 / AI 질문 섞어서 제공
+  - **API**: `POST /mbti-test/{session_id}/answer` → 다음 질문
+  - **✅ 인수 조건**: 대화 히스토리 유지, 질문 타입 혼합
 
-### Phase 1: 병렬 개발 - Consult + Converter (동시 진행 가능 🔥)
+- [ ] `MBTI-7` [MBTI] MBTI 결과 도출 및 저장
+  - **📖 유저 스토리**: "5-10턴 대화 후, MBTI 결과가 도출된다"
+  - **Domain**: `MBTIResult` (mbti, confidence, analysis)
+  - **UseCase**: `CalculateMBTIResultUseCase` - 응답 기반 분석
+  - **API 확장**: 마지막 응답에 `is_completed: true`, `result` 포함
+  - **✅ 인수 조건**: MBTI 도출, User.mbti 자동 업데이트
 
-> **팀 구성 제안**:
-> - **Team Consult** (4명, 페어 2팀): HAIS-11~16 담당
-> - **Team Converter** (2명, 페어 1팀): HAIS-17~19 담당
-> - Phase 0 완료 후 두 팀이 동시에 작업 시작 가능!
-> - **각 항목은 2-3시간 단위**로 작게 쪼개져 있어 관리 용이
+#### Matching Domain (Team Match)
 
-#### Team Consult: 상담 기능 (Thin Slice 방식 🎯)
+- [ ] `MATCH-1` [Matching] 매칭 대기열 등록
+  - **📖 유저 스토리**: "사용자로서, 매칭 대기열에 등록하고 싶다"
+  - **Domain**: `MatchingQueue` (user_id, status, created_at)
+  - **API**: `POST /matching/queue` → 대기열 등록
+  - **✅ 인수 조건**: 대기열 등록, 중복 등록 방지
 
-- [x] `HAIS-11` [Consult] 상담 세션 생성 **🔐 인증 필수**
-  - **📖 유저 스토리**: "로그인한 사용자로서, 상담 세션을 시작하고 싶다"
-  - **Domain**: `ConsultSession` (id, user_id, profile, created_at)
-  - **Repository**: `ConsultRepositoryPort` + In-Memory 구현
-  - **API**: `POST /consult/start` (Header: Authorization) → `{"session_id": "uuid"}`
-  - **✅ 인수 조건**: UUID 세션 생성, user_id 연결, 세션 검증, 프로필 저장, curl 테스트 가능
+- [ ] `MATCH-2` [Matching] 랜덤 매칭 실행
+  - **📖 유저 스토리**: "사용자로서, 대기 중인 다른 사용자와 랜덤 매칭되고 싶다"
+  - **Domain**: `Match` (id, user1_id, user2_id, status, created_at)
+  - **UseCase**: `RandomMatchUseCase` - 대기열에서 2명 매칭
+  - **API**: `POST /matching/random` → 매칭 결과 반환
+  - **✅ 인수 조건**: 2명 매칭, 매칭 시 상대 MBTI 표시, 채팅방 생성
 
-- [x] `HAIS-11-DB` [Consult] 상담 세션 DB 마이그레이션 **[STRUCTURAL]**
-  - **📖 목적**: In-Memory 구현체를 실제 DB로 교체 (영속성 확보)
-  - **작업 내용**:
-    - `ConsultRepositoryPort` 구현체를 In-Memory → DB(PostgreSQL/MySQL/기타)로 교체
-    - DB 테이블 스키마 설계 및 마이그레이션 스크립트 작성
-    - 기존 테스트는 **모두 통과**해야 함 (동작 변경 없음)
-    - 테스트용 Fake Repository는 유지 (통합 테스트에서 활용)
-  - **✅ 인수 조건**:
-    - 모든 기존 API 테스트 통과
-    - 세션 재시작 후에도 데이터 유지 (영속성 검증)
-    - DB 연결 실패 시 적절한 에러 핸들링
-  - **⚠️ 주의**: 이 작업은 Structural Change이므로 별도 커밋으로 분리
+- [ ] `MATCH-3` [Matching] 일일 매칭 횟수 제한
+  - **📖 유저 스토리**: "무료 사용자로서, 하루 3회까지 매칭할 수 있다"
+  - **Domain 확장**: `User.daily_match_count`, `User.last_match_date`
+  - **UseCase 확장**: 매칭 전 횟수 체크
+  - **API 확장**: 잔여 횟수 반환, 초과 시 402 에러
+  - **✅ 인수 조건**: 3회 초과 시 에러, 자정에 리셋
 
-- [x] `HAIS-12` [Consult] AI 인사 메시지 추가
-  - **📖 유저 스토리**: "사용자로서, 세션을 시작하면 내 MBTI에 맞는 AI 인사말을 받고 싶다"
-  - **Port**: `AICounselorPort` 인터페이스 정의 (generate_greeting 메서드)
-  - **Adapter 구현**:
-    - `FakeAICounselor`: 테스트용 구현체 (고정 인사말)
-    - `OpenAICounselorAdapter`: 프로덕션 구현체 (OpenAI API 연동)
-      - MBTI 4차원 특성 프롬프트 (E/I, S/N, T/F, J/P)
-      - 차원별 톤 가이드라인 (활발함/차분함, 구체적/추상적, 논리적/감정적, 체계적/유연함)
-      - gpt-4o-mini 모델 사용
-  - **UseCase**: `StartConsultUseCase` 확장 (ai_counselor 주입)
-  - **API 확장**: 응답에 `greeting` 필드 추가
-  - **테스트 스크립트**: OpenAI API 실제 테스트 스크립트 작성
-  - **✅ 인수 조건**: AI 인사말 포함, MBTI 4차원 특성 반영, OpenAI API 연동 성공
+#### Chat Domain (Team Match)
 
-- [x] `HAIS-13` [Consult] 메시지 전송 기본 **🔐 인증 필수**
-  - **📖 유저 스토리**: "로그인한 사용자로서, 질문을 보내고 AI의 답변을 받고 싶다"
-  - **Domain 확장**: `Message` 도메인 (role, content, timestamp)
-  - **Domain 확장**: `ConsultSession.add_message()`, `get_messages()`
-  - **Port 확장**: `AICounselorPort.generate_response()` 추가
-  - **UseCase**: `SendMessageUseCase` 생성 (세션 소유자 검증 포함)
-  - **API**: `POST /consult/{session_id}/message` (Header: Authorization) → 일반 JSON 응답
-  - **✅ 인수 조건**: 메시지 저장, user_id 검증 (세션 소유자만 접근), AI 응답 생성, 대화 히스토리 조회 가능
+- [ ] `CHAT-1` [Chat] 채팅방 생성
+  - **📖 유저 스토리**: "매칭 성공 시, 자동으로 채팅방이 생성된다"
+  - **Domain**: `ChatRoom` (id, match_id, created_at)
+  - **Domain**: `ChatMessage` (id, room_id, sender_id, content, created_at)
+  - **Repository**: `ChatRoomRepository`
+  - **✅ 인수 조건**: 매칭 시 채팅방 자동 생성
 
-- [x] `HAIS-14` [Consult] SSE 스트리밍 추가
-  - **📖 유저 스토리**: "사용자로서, AI 응답이 한 글자씩 실시간으로 나타나길 원한다"
-  - **Adapter 확장**: OpenAI 스트리밍 모드
-  - **API 확장**: SSE (Server-Sent Events) 응답 형식
-  - **✅ 인수 조건**: 스트리밍 응답, EventSource로 수신 가능
+- [ ] `CHAT-2` [Chat] WebSocket 연결
+  - **📖 유저 스토리**: "사용자로서, 실시간으로 메시지를 주고받고 싶다"
+  - **Adapter**: WebSocket 핸들러 (FastAPI WebSocket)
+  - **API**: `WS /chat/{room_id}`
+  - **✅ 인수 조건**: WebSocket 연결, 실시간 메시지 송수신
 
-- [x] `HAIS-15` [Consult] 턴 관리 및 제한
-  - **📖 유저 스토리**: "사용자로서, 5턴 대화 후 자동으로 분석 단계로 전환되길 원한다"
-  - **Domain 확장**: `ConsultSession.get_user_turn_count()`, `is_completed()`
-  - **UseCase 확장**: 5턴 체크, 초과 시 에러
-  - **API 확장**: 응답에 `remaining_turns` 필드 추가
-  - **✅ 인수 조건**: 턴 카운트 정확, 5턴 초과 시 400 에러
+- [ ] `CHAT-3` [Chat] 메시지 저장 및 조회
+  - **📖 유저 스토리**: "사용자로서, 이전 메시지를 다시 볼 수 있다"
+  - **Repository**: `ChatMessageRepository`
+  - **API**: `GET /chat/{room_id}/messages` → 메시지 히스토리
+  - **✅ 인수 조건**: 메시지 영속화, 페이지네이션
 
-- [x] `HAIS-16` [Consult] 5턴 완료 시 자동 분석
-  - **📖 유저 스토리**: "사용자로서, 5턴 완료 후 종료 안내와 함께 자동으로 분석 결과를 받고 싶다"
-  - **Domain**: `Analysis` (situation, traits, solutions, cautions)
-  - **Port 확장**: `AICounselorPort.generate_analysis()`
-  - **UseCase 확장**: `SendMessageUseCase` - 5턴째 메시지 시 분석 자동 생성
-  - **API 확장**: 5턴째 응답에 `is_completed: true`, `analysis` 필드 포함
-  - **응답 메시지**: "무료 상담이 종료되었습니다. 프로 결제 시 추가 상담 가능합니다. 지금까지 대화를 바탕으로 분석해드릴게요!"
-  - **✅ 인수 조건**: 5턴 완료 시 자동 분석, 4개 섹션 포함, 종료 안내 메시지
+- [ ] `CHAT-4` [Chat] 채팅방 목록 조회
+  - **📖 유저 스토리**: "사용자로서, 내 채팅방 목록을 보고 싶다"
+  - **API**: `GET /chat/rooms` → 내 채팅방 목록
+  - **✅ 인수 조건**: 최근 메시지 미리보기, 안 읽은 메시지 카운트
 
-#### Team Converter: 변환 기능 (Thin Slice 방식 🔄)
+---
 
-- [x] `HAIS-17` [Converter] 메시지 변환 기본 (**Consult와 병렬 가능**) ✅
-  - **📖 유저 스토리**: "사용자로서, 내 메시지를 다른 톤으로 변환하고 싶다"
-  - **Domain**: `ToneMessage` (tone, content, explanation)
-  - **Port**: `MessageConverterPort` 인터페이스 정의
-  - **Adapter**: OpenAI 기반 변환 (1가지 톤만)
-  - **API**: `POST /converter/convert` → 1가지 톤 반환
-  - **✅ 인수 조건**: 톤 변환 작동, 해설 포함
+### Week 3: 매칭 고도화
 
-- [x] `HAIS-18` [Converter] 3가지 톤 동시 생성 ✅
-  - **📖 유저 스토리**: "사용자로서, 공손/캐주얼/간결 3가지 버전을 한 번에 받고 싶다"
-  - **UseCase**: `ConvertMessageUseCase` - 3가지 톤 병렬 생성
-  - **API 확장**: 응답에 3가지 톤 배열
-  - **✅ 인수 조건**: 3가지 톤 모두 포함, 각각 해설 있음
+> **목표**: MBTI 기반 매칭 알고리즘으로 매칭 품질 개선
 
-- [x] `HAIS-19` [Converter] MBTI 맞춤 변환 ✅
-  - **📖 유저 스토리**: "사용자로서, 발신자/수신자 MBTI를 고려한 최적의 표현을 원한다"
-  - **UseCase 확장**: 발신자/수신자 MBTI 파라미터 추가
-  - **Adapter 확장**: 프롬프트에 MBTI 특성 반영
-  - **API 확장**: MBTI 검증, 400 에러 핸들링
-  - **✅ 인수 조건**: MBTI 특성 반영된 변환, 잘못된 MBTI는 400
+#### MBTI 기반 매칭 알고리즘 (Team MBTI)
 
-### Phase 2: 마이페이지 & 상담 히스토리
+- [ ] `MATCH-4` [Matching] MBTI 궁합 매칭
+  - **📖 유저 스토리**: "사용자로서, MBTI 궁합이 좋은 사람과 매칭되고 싶다"
+  - **Domain**: `MBTICompatibility` - 궁합 점수 계산
+  - **UseCase**: `CompatibilityMatchUseCase` - 궁합 기반 매칭
+  - **API**: `POST /matching/compatibility` → MBTI 궁합 매칭
+  - **✅ 인수 조건**: 궁합 점수 높은 순 매칭
 
-- [x] `HAIS-20` [Consult] 분석 결과 DB 저장
-  - **📖 유저 스토리**: "사용자로서, 상담 분석 결과를 나중에 다시 보고 싶다"
-  - **DB 스키마**: consult_sessions 테이블에 analysis_json 컬럼 추가
-  - **UseCase 수정**: 분석 생성 시 DB에 저장
-  - **✅ 인수 조건**: 분석 결과가 DB에 영속화됨
+- [ ] `MATCH-5` [Matching] 유사 MBTI 매칭
+  - **📖 유저 스토리**: "사용자로서, 나와 비슷한 MBTI 사람과 매칭되고 싶다"
+  - **UseCase**: `SimilarMBTIMatchUseCase`
+  - **API**: `POST /matching/similar` → 유사 MBTI 매칭
+  - **✅ 인수 조건**: 같은/유사 MBTI 우선 매칭
 
-- [x] `HAIS-21` [Consult] 상담 히스토리 API
-  - **📖 유저 스토리**: "사용자로서, 내 과거 상담 목록을 조회하고 싶다"
-  - **API**: `GET /consult/history` → 사용자의 완료된 상담 목록 + 분석 결과
-  - **✅ 인수 조건**: 로그인한 사용자의 상담 히스토리 조회 가능
+---
 
-- [x] `HAIS-22` [Frontend] 마이페이지 생성
-  - **📖 유저 스토리**: "사용자로서, 헤더의 이메일을 클릭하면 마이페이지에서 상담 히스토리를 보고 싶다"
-  - **페이지**: `/mypage` - 프로필 정보 + 상담 히스토리 목록
-  - **헤더 수정**: 이메일 클릭 시 마이페이지로 이동
-  - **✅ 인수 조건**: 마이페이지에서 과거 분석 결과 카드 형태로 표시
+### Week 4: 그로스 해킹
 
-### Phase 3: 통합 테스트 (E2E)
+> **목표**: 서비스가 스스로 확산되고, 누군가는 실제로 돈을 지불하는지 검증
 
-- [ ] `HAIS-23` [E2E] 상담 전체 플로우 검증 - 시작 → 5턴 대화 → 분석 → 마이페이지 조회
-- [ ] `HAIS-24` [E2E] 변환 전체 플로우 검증 - 변환 요청 → 3가지 톤 결과 반환
+#### Referral Domain (레퍼럴)
+
+- [ ] `REF-1` [Referral] 초대 코드 생성
+  - **📖 유저 스토리**: "사용자로서, 친구 초대용 코드를 받고 싶다"
+  - **Domain**: `ReferralCode` (code, user_id, created_at)
+  - **API**: `GET /referral/code` → 내 초대 코드
+  - **✅ 인수 조건**: 유니크 코드 생성, 사용자당 1개
+
+- [ ] `REF-2` [Referral] 초대 코드 사용
+  - **📖 유저 스토리**: "신규 사용자로서, 초대 코드를 입력하면 보상을 받는다"
+  - **Domain**: `ReferralReward` (referrer_id, referee_id, rewarded_at)
+  - **UseCase**: `UseReferralCodeUseCase`
+  - **API**: `POST /referral/use` → 코드 사용
+  - **✅ 인수 조건**: 양쪽에 추가 매칭권 +1, 중복 사용 방지
+
+- [ ] `REF-3` [Referral] 레퍼럴 현황 조회
+  - **📖 유저 스토리**: "사용자로서, 내가 초대한 친구 수를 보고 싶다"
+  - **API**: `GET /referral/stats` → 초대 현황
+  - **✅ 인수 조건**: 초대 수, 보상 내역
+
+#### Payment (최소 결제)
+
+- [ ] `PAY-1` [Payment] 매칭권 구매
+  - **📖 유저 스토리**: "사용자로서, 추가 매칭권을 구매하고 싶다"
+  - **Domain**: `MatchingTicket` (user_id, count, purchased_at)
+  - **UseCase**: `PurchaseTicketUseCase`
+  - **API**: `POST /payment/ticket` → 매칭권 구매
+  - **✅ 인수 조건**: 1,000원/회 결제, 매칭권 추가
+
+- [ ] `PAY-2` [Payment] 결제 연동 (토스페이먼츠 or 카카오페이)
+  - **📖 유저 스토리**: "사용자로서, 간편하게 결제하고 싶다"
+  - **Adapter**: 결제 API 연동
+  - **✅ 인수 조건**: 실결제 처리, 결제 내역 저장
+
+---
+
+## 성공 지표 체크리스트
+
+| KR | 목표 | 측정 방법 |
+|----|------|----------|
+| 가입자 | 100명 | User 테이블 count |
+| 레퍼럴 유입 | 20명+ | ReferralReward 테이블 count |
+| WAU | 20명+ | 주간 로그인 유저 |
+| 대화 지속률 | 50%+ | 매칭 후 5개 이상 메시지 교환 비율 |
+| 결제 유저 | 1명+ | Payment 테이블 count |
