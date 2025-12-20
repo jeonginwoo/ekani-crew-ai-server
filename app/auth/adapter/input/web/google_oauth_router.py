@@ -9,6 +9,7 @@ from app.auth.infrastructure.repository.redis_session_repository import RedisSes
 from app.auth.application.port.session_repository_port import SessionRepositoryPort
 from app.auth.domain.session import Session
 from app.user.infrastructure.model.user_model import UserModel
+from app.auth.infrastructure.model.oauth_identity_model import OAuthIdentityModel
 from config.database import get_db
 from config.settings import get_settings
 from config.redis import redis_client
@@ -52,16 +53,37 @@ async def google_callback(
     email = profile.get("email")
     google_id = profile.get("sub")
 
-    # 유저 조회 또는 생성
-    user = db.query(UserModel).filter(UserModel.id == google_id).first()
-    if not user:
-        user = UserModel(id=google_id, email=email)
-        db.add(user)
+    # OAuth identity로 기존 유저 조회
+    oauth_identity = db.query(OAuthIdentityModel).filter(
+        OAuthIdentityModel.provider == "google",
+        OAuthIdentityModel.provider_user_id == google_id,
+    ).first()
+
+    if oauth_identity:
+        # 기존 유저
+        user = oauth_identity.user
+    else:
+        # 이메일로 기존 유저 조회 (다른 OAuth로 가입했을 수 있음)
+        user = db.query(UserModel).filter(UserModel.email == email).first()
+        if not user:
+            # 새 유저 생성
+            user = UserModel(email=email)
+            db.add(user)
+            db.flush()  # user.id 생성을 위해
+
+        # OAuth identity 생성
+        oauth_identity = OAuthIdentityModel(
+            user_id=user.id,
+            provider="google",
+            provider_user_id=google_id,
+            email=email,
+        )
+        db.add(oauth_identity)
         db.commit()
 
-    # Session 생성 (Redis에 저장)
+    # Session 생성 (Redis에 저장) - user.id (UUID)를 저장
     session_id = str(uuid.uuid4())
-    await session_repo.save(Session(session_id=session_id, user_id=google_id))
+    await session_repo.save(Session(session_id=session_id, user_id=user.id))
 
     # 프론트엔드로 리다이렉트 + 쿠키 설정
     settings = get_settings()

@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy import Column, String, DateTime
 from sqlalchemy.orm import relationship
 from config.database import Base
@@ -8,7 +10,7 @@ class UserModel(Base):
 
     __tablename__ = "users"
 
-    id = Column(String(36), primary_key=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     email = Column(String(255), nullable=False, unique=True, index=True)
     mbti = Column(String(4), nullable=True)
     gender = Column(String(10), nullable=True)
@@ -16,3 +18,4 @@ class UserModel(Base):
 
     # Relationships
     consult_sessions = relationship("ConsultSessionModel", back_populates="user")
+    oauth_identities = relationship("OAuthIdentityModel", back_populates="user")
