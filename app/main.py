@@ -17,8 +17,8 @@ async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     print("[+] Database tables created")
 
-    # Redis 연결 테스트
-    redis_client.ping()
+    # Redis 연결 테스트 (비동기)
+    await redis_client.ping()
     print("[+] Redis connected")
 
     yield
@@ -26,7 +26,7 @@ async def lifespan(_: FastAPI):
     # Shutdown
     print("[-] Shutting down HexaCore AI Server...")
     engine.dispose()
-    redis_client.close()
+    await redis_client.aclose()
     print("[+] Database and Redis connections closed")
 
 

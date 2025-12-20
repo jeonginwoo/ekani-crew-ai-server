@@ -61,7 +61,7 @@ async def google_callback(
 
     # Session 생성 (Redis에 저장)
     session_id = str(uuid.uuid4())
-    session_repo.save(Session(session_id=session_id, user_id=google_id))
+    await session_repo.save(Session(session_id=session_id, user_id=google_id))
 
     # 프론트엔드로 리다이렉트 + 쿠키 설정
     settings = get_settings()
@@ -90,7 +90,7 @@ async def auth_status(
     if not session_id:
         return {"logged_in": False}
 
-    session = session_repo.find_by_session_id(session_id)
+    session = await session_repo.find_by_session_id(session_id)
 
     if not session:
         return {"logged_in": False}
@@ -114,7 +114,7 @@ async def logout(
 ):
     """로그아웃 - 세션 삭제"""
     if session_id:
-        session_repo.delete(session_id)
+        await session_repo.delete(session_id)
 
     response = JSONResponse(status_code=204, content=None)
     response.delete_cookie("session_id")
