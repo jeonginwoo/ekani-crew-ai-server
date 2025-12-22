@@ -10,9 +10,9 @@ description: "Create backlog item for next test in plan.md"
 
 ## 규칙
 
-1. 사용자가 텍스트 선택 → 해당 항목 백로그 생성
-2. 선택 없음 → plan.md에서 다음 `- [ ]` 항목 찾아서 생성
-3. 노션에 바로 붙여넣기 가능한 마크다운 형식
+1. `/backlog MBTI-1` → 해당 백로그 ID 항목의 백로그 생성
+2. `/backlog` (argument 없음) → plan.md에서 다음 `- [ ]` 항목 찾아서 생성
+3. 노션에 바로 붙여넣기 가능한 마크다운 형식 (코드블록으로 감싸서 출력)
 
 ---
 
@@ -20,7 +20,7 @@ description: "Create backlog item for next test in plan.md"
 
 ```markdown
 # 제목
-- [Domain] 사용자로서, ~하고 싶다 [AIS-백로그ID]
+- [Domain] 사용자로서, ~하고 싶다 [백로그ID]
 
 # Domain
 - (도메인명)
@@ -50,7 +50,7 @@ description: "Create backlog item for next test in plan.md"
 
 ```markdown
 # 제목
-- [MBTI] 사용자로서, 채팅 형식으로 MBTI 검사를 시작하고 싶다 [AIS-MBTI-1]
+- [MBTI] 사용자로서, 채팅 형식으로 MBTI 검사를 시작하고 싶다 [MBTI-1]
 
 # Domain
 - MBTI Test Domain
@@ -78,7 +78,7 @@ description: "Create backlog item for next test in plan.md"
 
 ## 작성 원칙
 
-- **제목**: `[Domain] 사용자로서, ~하고 싶다 [AIS-XXX]` (plan.md 형식 그대로)
+- **제목**: `[Domain] 사용자로서, ~하고 싶다 [Domain-N]` (plan.md 형식 그대로)
 - **Purpose**: 사용자 스토리 → 배경 → 핵심 목적
 - **Success Criteria**: PM/QA가 확인 가능한 조건
 - **Todo**: 도메인 → UseCase → 테스트 → API 순서
