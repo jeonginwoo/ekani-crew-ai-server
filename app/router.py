@@ -6,6 +6,7 @@ All application routers are registered here and imported into main.py.
 from fastapi import FastAPI
 
 from app.auth.adapter.input.web.google_oauth_router import google_oauth_router
+from app.match.adapter.input.web.match_router import match_router
 from app.user.infrastructure.model.user_model import UserModel  # noqa: F401
 from app.consult.infrastructure.model.consult_session_model import ConsultSessionModel  # noqa: F401
 from app.consult.adapter.input.web.consult_router import consult_router
@@ -23,4 +24,5 @@ def setup_routers(app: FastAPI) -> None:
     app.include_router(consult_router, prefix="/consult", tags=["Consult"])
     app.include_router(mbti_router, prefix="/mbti-test", tags=["MBTI Test"])
     app.include_router(chat_websocket_router, tags=["Chat"])
+    app.include_router(match_router, prefix="/match", tags=["Match"])
 
