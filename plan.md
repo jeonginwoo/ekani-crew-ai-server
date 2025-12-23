@@ -109,9 +109,8 @@ Person C ───→ MATCH-1 → MATCH-2 → MATCH-3
 Person D ───→ CHAT-1 → CHAT-2 → CHAT-3 → CHAT-4
 조장 ───────→ PAY-1 + 병목 지원
 
-[Week 3] 매칭 고도화
-Person A ───→ MATCH-4 (궁합 매칭)
-Person B ───→ MATCH-5 (유사 매칭)
+[Week 3] 테스트 및 안정화
+Person A,B ─→ (여유 - 다른 도메인 지원 가능)
 Person C,D ─→ TEST-1, TEST-2 (통합/부하 테스트)
 조장 ───────→ PAY-2 (결제 API)
 
@@ -256,11 +255,18 @@ Person C,D ─→ 버그 픽스, UX 개선
   - **API**: `POST /matching/queue` → 대기열 등록
   - **✅ 인수 조건**: 대기열 등록, 중복 등록 방지
 
-- [ ] `MATCH-2` [Matching] 사용자로서, 대기 중인 다른 사용자와 랜덤 매칭되고 싶다
+- [ ] `MATCH-2` [Matching] 사용자로서, MBTI 궁합 기반으로 매칭되고 싶다
   - **Domain**: `Match` (id, user1_id, user2_id, status, created_at)
-  - **UseCase**: `RandomMatchUseCase` - 대기열에서 2명 매칭
-  - **API**: `POST /matching/random` → 매칭 결과 반환
-  - **✅ 인수 조건**: 2명 매칭, 매칭 시 상대 MBTI 표시, 채팅방 생성
+  - **Domain**: `MBTICompatibility` (mbti1, mbti2, score) - DB에 미리 저장된 궁합 테이블
+  - **UseCase**: `SmartMatchUseCase` - 시간 기반 스마트 매칭
+    - 대기 시작 직후: 궁합 점수 높은 사람 우선 매칭
+    - 시간이 지남: 점점 궁합 조건 완화
+    - 일정 시간 초과: 아무 MBTI나 매칭
+  - **API**: `POST /matching/queue` → 대기열 등록 후 자동 매칭
+  - **✅ 인수 조건**:
+    - 처음엔 궁합 좋은 사람 우선 매칭
+    - 대기 시간이 길어지면 조건 완화하여 아무나 매칭
+    - 매칭 시 상대 MBTI 표시, 채팅방 생성
 
 - [ ] `MATCH-3` [Matching] 무료 사용자로서, 하루 3회까지 매칭할 수 있다
   - **Domain 확장**: `User.daily_match_count`, `User.last_match_date`
@@ -296,25 +302,6 @@ Person C,D ─→ 버그 픽스, UX 개선
   - **UseCase**: `GetMyChatRoomsUseCase` - 내 채팅방 목록 조회
   - **API**: `GET /chat/rooms` → 내 채팅방 목록
   - **✅ 인수 조건**: DB에서 채팅방 목록 조회, 최근 메시지 미리보기, 안 읽은 메시지 카운트
-
----
-
-### Week 3: 매칭 고도화
-
-> **목표**: MBTI 기반 매칭 알고리즘으로 매칭 품질 개선
-
-#### MBTI 기반 매칭 알고리즘 (Team MBTI)
-
-- [ ] `MATCH-4` [Matching] 사용자로서, MBTI 궁합이 좋은 사람과 매칭되고 싶다
-  - **Domain**: `MBTICompatibility` - 궁합 점수 계산
-  - **UseCase**: `CompatibilityMatchUseCase` - 궁합 기반 매칭
-  - **API**: `POST /matching/compatibility` → MBTI 궁합 매칭
-  - **✅ 인수 조건**: 궁합 점수 높은 순 매칭
-
-- [ ] `MATCH-5` [Matching] 사용자로서, 나와 비슷한 MBTI 사람과 매칭되고 싶다
-  - **UseCase**: `SimilarMBTIMatchUseCase`
-  - **API**: `POST /matching/similar` → 유사 MBTI 매칭
-  - **✅ 인수 조건**: 같은/유사 MBTI 우선 매칭
 
 ---
 
