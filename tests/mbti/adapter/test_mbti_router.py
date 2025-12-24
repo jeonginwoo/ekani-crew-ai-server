@@ -1,40 +1,59 @@
 import uuid
 import pytest
+from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
+from fastapi import FastAPI
 
-# This fixture is based on app/test_main.py
+from app.mbti_test.adapter.input.web.mbti_router import mbti_router
+from app.auth.domain.session import Session
+
+
 @pytest.fixture
-def client():
-    """Mock lifespan events for testing without a real DB connection."""
-    with patch('config.database.engine') as mock_engine:
-        with patch('config.database.Base') as mock_base:
-            mock_engine.dispose = MagicMock()
-            from app.main import app
-            with TestClient(app) as c:
-                yield c
+def app():
+    """테스트용 FastAPI 앱"""
+    app = FastAPI()
+    app.include_router(mbti_router, prefix="/mbti-test")
+    return app
+
+
+@pytest.fixture
+def client(app):
+    """테스트 클라이언트"""
+    return TestClient(app)
+
+
+def mock_session(session: Session):
+    """세션 인증을 모킹하는 컨텍스트 매니저"""
+    mock_repo = AsyncMock()
+    mock_repo.find_by_session_id.return_value = session
+    return patch(
+        "app.auth.adapter.input.web.auth_dependency.RedisSessionRepository",
+        return_value=mock_repo
+    )
 
 
 def test_start_mbti_test_endpoint(client: TestClient):
     # Given
     user_id = uuid.uuid4()
-    request_data = {"user_id": str(user_id)}
+    session = Session(session_id="valid-session", user_id=str(user_id))
 
     # When
-    response = client.post("/mbti_test-test/start", json=request_data)
+    with mock_session(session):
+        response = client.post(
+            "/mbti-test/start?test_type=ai",
+            cookies={"session_id": "valid-session"}
+        )
 
     # Then
     assert response.status_code == 200
     response_json = response.json()
-    assert "session_id" in response_json
+    assert "session" in response_json
     assert "first_question" in response_json
 
-    # Validate session_id is a UUID
-    try:
-        uuid.UUID(response_json["session_id"])
-    except ValueError:
-        pytest.fail("session_id is not a valid UUID")
 
-    # Check if the question is a non-empty string
-    assert isinstance(response_json["first_question"], str)
-    assert len(response_json["first_question"]) > 0
+def test_start_mbti_test_without_auth_returns_401(client: TestClient):
+    # When
+    response = client.post("/mbti-test/start?test_type=ai")
+
+    # Then
+    assert response.status_code == 401

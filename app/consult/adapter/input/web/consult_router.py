@@ -69,9 +69,9 @@ def start_consult(
     return result
 
 
-@consult_router.post("/{session_id}/message")
+@consult_router.post("/{consult_session_id}/message")
 def send_message(
-    session_id: str,
+    consult_session_id: str,
     request: SendMessageRequest,
     user_id: str = Depends(get_current_user_id),
     consult_repo: ConsultRepositoryPort = Depends(get_consult_repository),
@@ -88,7 +88,7 @@ def send_message(
 
     try:
         result = use_case.execute(
-            session_id=session_id,
+            session_id=consult_session_id,
             user_id=user_id,
             content=request.content
         )
@@ -138,9 +138,9 @@ def get_history(
     }
 
 
-@consult_router.post("/{session_id}/message/stream")
+@consult_router.post("/{consult_session_id}/message/stream")
 def send_message_stream(
-    session_id: str,
+    consult_session_id: str,
     request: SendMessageRequest,
     user_id: str = Depends(get_current_user_id),
     consult_repo: ConsultRepositoryPort = Depends(get_consult_repository),
@@ -154,7 +154,7 @@ def send_message_stream(
     3. AI 응답 스트리밍 반환
     """
     # 세션 조회 및 소유자 검증
-    session = consult_repo.find_by_id(session_id)
+    session = consult_repo.find_by_id(consult_session_id)
     if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

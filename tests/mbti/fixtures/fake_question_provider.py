@@ -3,7 +3,6 @@ from app.mbti_test.domain.mbti_message import MBTIMessage, MessageRole, MessageS
 
 
 class FakeQuestionProvider(QuestionProviderPort):
-    @property
     def get_initial_question(self) -> MBTIMessage:
         return MBTIMessage(
             role= MessageRole.ASSISTANT,
