@@ -12,3 +12,5 @@ redis
 pytest
 pytest-mock
 cryptography
+websockets
+uvicorn[standard]
