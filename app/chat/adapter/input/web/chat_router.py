@@ -1,10 +1,14 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional
 
 from app.chat.application.use_case.get_chat_history_use_case import GetChatHistoryUseCase
+from app.chat.application.use_case.get_my_chat_rooms_use_case import GetMyChatRoomsUseCase
 from app.chat.application.port.chat_message_repository_port import ChatMessageRepositoryPort
+from app.chat.application.port.chat_room_repository_port import ChatRoomRepositoryPort
 from app.chat.infrastructure.repository.mysql_chat_message_repository import MySQLChatMessageRepository
+from app.chat.infrastructure.repository.mysql_chat_room_repository import MySQLChatRoomRepository
 from config.database import get_db_session
 
 chat_router = APIRouter()
@@ -13,6 +17,11 @@ chat_router = APIRouter()
 def get_chat_message_repository() -> ChatMessageRepositoryPort:
     """ChatMessage Repository 의존성 주입"""
     return MySQLChatMessageRepository(get_db_session())
+
+
+def get_chat_room_repository() -> ChatRoomRepositoryPort:
+    """ChatRoom Repository 의존성 주입"""
+    return MySQLChatRoomRepository(get_db_session())
 
 
 class ChatMessageResponse(BaseModel):
@@ -27,6 +36,21 @@ class ChatMessageResponse(BaseModel):
 class ChatHistoryResponse(BaseModel):
     """채팅 기록 응답 DTO"""
     messages: list[ChatMessageResponse]
+
+
+class ChatRoomPreviewResponse(BaseModel):
+    """채팅방 미리보기 응답 DTO"""
+    id: str
+    user1_id: str
+    user2_id: str
+    created_at: datetime
+    latest_message: Optional[ChatMessageResponse] = None
+    unread_count: int = 0
+
+
+class MyChatRoomsResponse(BaseModel):
+    """내 채팅방 목록 응답 DTO"""
+    rooms: list[ChatRoomPreviewResponse]
 
 
 @chat_router.get("/chat/{room_id}/messages", response_model=ChatHistoryResponse)
@@ -55,3 +79,43 @@ def get_chat_history(
     ]
 
     return ChatHistoryResponse(messages=message_responses)
+
+
+@chat_router.get("/chat/rooms/my", response_model=MyChatRoomsResponse)
+def get_my_chat_rooms(
+    user_id: str,
+    room_repository: ChatRoomRepositoryPort = Depends(get_chat_room_repository),
+    message_repository: ChatMessageRepositoryPort = Depends(get_chat_message_repository)
+):
+    """
+    사용자의 채팅방 목록을 조회한다.
+
+    - user_id: 사용자 ID
+    - 반환: 최신 메시지 미리보기와 읽지 않은 메시지 수를 포함한 채팅방 목록
+    """
+    use_case = GetMyChatRoomsUseCase(room_repository, message_repository)
+    room_previews = use_case.execute(user_id)
+
+    room_responses = []
+    for preview in room_previews:
+        latest_message_response = None
+        if preview.latest_message:
+            latest_message_response = ChatMessageResponse(
+                id=preview.latest_message.id,
+                room_id=preview.latest_message.room_id,
+                sender_id=preview.latest_message.sender_id,
+                content=preview.latest_message.content,
+                created_at=preview.latest_message.created_at
+            )
+
+        room_response = ChatRoomPreviewResponse(
+            id=preview.id,
+            user1_id=preview.user1_id,
+            user2_id=preview.user2_id,
+            created_at=preview.created_at,
+            latest_message=latest_message_response,
+            unread_count=preview.unread_count
+        )
+        room_responses.append(room_response)
+
+    return MyChatRoomsResponse(rooms=room_responses)

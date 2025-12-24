@@ -232,7 +232,7 @@ Person C,D ─→ 버그 픽스, UX 개선
   - **API**: `GET /chat/{room_id}/messages` → 메시지 히스토리
   - **✅ 인수 조건**: DB에서 메시지 조회, 시간순 
 
-- [ ] `CHAT-4` [Chat] 사용자로서, 내 채팅방 목록을 보고 싶다
+- [x] `CHAT-4` [Chat] 사용자로서, 내 채팅방 목록을 보고 싶다
   - **UseCase**: `GetMyChatRoomsUseCase` - 내 채팅방 목록 조회
   - **API**: `GET /chat/rooms` → 내 채팅방 목록
   - **✅ 인수 조건**: DB에서 채팅방 목록 조회, 최근 메시지 미리보기, 안 읽은 메시지 카운트
