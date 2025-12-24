@@ -1,6 +1,8 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi.testclient import TestClient
+
+from app.match.application.factory.match_usecase_factory import MatchUseCaseFactory
 from app.match.application.usecase.match_usecase import MatchUseCase
 from tests.match.fixtures.fake_match_queue_adapter import FakeMatchQueueAdapter
 
@@ -20,14 +22,18 @@ def client():
 @pytest.fixture
 def mock_usecase_factory():
     fake_adapter = FakeMatchQueueAdapter()
-    # 상태 유지를 위해 factory 호출 시마다 매번 새로운 fake_adapter가 아닌,
-    # 이 테스트 함수 내에서 공유되는 adapter를 가진 usecase를 반환하도록 함
-    usecase_instance = MatchUseCase(match_queue_port=fake_adapter)
 
-    # Factory.create()가 호출될 때 이 usecase_instance를 반환하게 설정
-    with patch("app.match.application.factory.match_usecase_factory.MatchUseCaseFactory.create") as mock_create:
-        mock_create.return_value = usecase_instance
-        yield fake_adapter  # 테스트 코드에서 adapter 상태 확인용으로 반환
+    mock_chat_port = AsyncMock()
+    mock_chat_port.create_chat_room.return_value = True
+
+    usecase_instance = MatchUseCase(
+        match_queue_port=fake_adapter,
+        chat_room_port=mock_chat_port
+    )
+
+    MatchUseCaseFactory.create = MagicMock(return_value=usecase_instance)
+
+    return fake_adapter
 
 
 def test_request_match_endpoint(client, mock_usecase_factory):

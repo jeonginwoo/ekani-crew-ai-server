@@ -1,3 +1,7 @@
+import uuid
+from datetime import datetime
+
+from app.match.application.port.output.chat_room_port import ChatRoomPort
 from app.match.application.service.match_service import MatchService
 from app.shared.vo.mbti import MBTI
 from app.match.domain.match_ticket import MatchTicket
@@ -5,9 +9,10 @@ from app.match.application.port.output.match_queue_port import MatchQueuePort
 
 
 class MatchUseCase:
-    def __init__(self, match_queue_port: MatchQueuePort):
+    def __init__(self, match_queue_port: MatchQueuePort, chat_room_port: ChatRoomPort):
         self.match_queue = match_queue_port
         self.match_service = MatchService(match_queue_port)
+        self.chat_room_port = chat_room_port
 
     async def request_match(self, user_id: str, mbti: MBTI, level: int = 1) -> dict:
         """
@@ -20,10 +25,26 @@ class MatchUseCase:
         partner_ticket = await self.match_service.find_partner(my_ticket, level)
 
         if partner_ticket:
-            # 매칭 성공! (나는 큐에 안 들어감, 상대는 큐에서 나옴)
+            # 2. [MATCH-3] 매칭 성공 시 채팅방 데이터 생성
+            room_id = str(uuid.uuid4())
+            timestamp = datetime.now().isoformat()
+
+            match_payload = {
+                "roomId": room_id,
+                "users": [
+                    {"userId": my_ticket.user_id, "mbti": my_ticket.mbti.value},
+                    {"userId": partner_ticket.user_id, "mbti": partner_ticket.mbti.value}
+                ],
+                "timestamp": timestamp
+            }
+
+            # 3. [MATCH-3] Chat 도메인으로 데이터 전송 (비동기 처리 가능)
+            await self.chat_room_port.create_chat_room(match_payload)
+
             return {
                 "status": "matched",
                 "message": "매칭이 성사되었습니다!",
+                "roomId": room_id,  # 클라이언트에게도 방 번호 전달
                 "my_mbti": mbti.value,
                 "partner": {
                     "user_id": partner_ticket.user_id,

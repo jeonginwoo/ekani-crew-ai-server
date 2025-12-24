@@ -1,3 +1,5 @@
+from unittest.mock import AsyncMock
+
 import pytest
 from app.shared.vo.mbti import MBTI
 from app.match.application.usecase.match_usecase import MatchUseCase
@@ -8,7 +10,15 @@ from tests.match.fixtures.fake_match_queue_adapter import FakeMatchQueueAdapter
 async def test_request_match_should_enqueue_user():
     # Given
     fake_adapter = FakeMatchQueueAdapter()
-    usecase = MatchUseCase(match_queue_port=fake_adapter)
+
+    mock_chat_port = AsyncMock()
+    mock_chat_port.create_chat_room.return_value = True
+
+    usecase = MatchUseCase(
+        match_queue_port=fake_adapter,
+        chat_room_port=mock_chat_port
+    )
+
     user_id = "user_test"
     mbti = MBTI("ENTP")
 
@@ -27,7 +37,15 @@ async def test_request_match_should_enqueue_user():
 async def test_request_match_duplicate_user():
     # Given
     fake_adapter = FakeMatchQueueAdapter()
-    usecase = MatchUseCase(match_queue_port=fake_adapter)
+
+    mock_chat_port = AsyncMock()
+    mock_chat_port.create_chat_room.return_value = True
+
+    usecase = MatchUseCase(
+        match_queue_port=fake_adapter,
+        chat_room_port=mock_chat_port
+    )
+
     user_id = "user_test"
     mbti = MBTI("ENTP")
 
@@ -46,7 +64,15 @@ async def test_request_match_duplicate_user():
 async def test_cancel_match_should_remove_user():
     # Given
     fake_adapter = FakeMatchQueueAdapter()
-    usecase = MatchUseCase(match_queue_port=fake_adapter)
+
+    mock_chat_port = AsyncMock()
+    mock_chat_port.create_chat_room.return_value = True
+
+    usecase = MatchUseCase(
+        match_queue_port=fake_adapter,
+        chat_room_port=mock_chat_port
+    )
+
     user_id = "user_cancel"
     mbti = MBTI("INFP")
 

@@ -1,12 +1,27 @@
+
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Literal
+from enum import Enum
+from typing import List, Dict
 
-from pydantic import BaseModel, Field
+class TestType(Enum):
+    HUMAN = "human"
+    AI = "ai"
 
+class TestStatus(Enum):
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
 
-class MBTITestSession(BaseModel):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+@dataclass
+class MBTITestSession:
+    id: uuid.UUID
     user_id: uuid.UUID
-    status: Literal["IN_PROGRESS", "COMPLETED"] = "IN_PROGRESS"
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    test_type: TestType
+    status: TestStatus
+    created_at: datetime
+    questions: List[str] = field(default_factory=list)  # 질문 히스토리
+    answers: List[Dict] = field(default_factory=list)
+    current_question_index: int = 0
+    selected_human_questions: List[str] = field(default_factory=list)  # 세션 시작 시 랜덤 선택된 12개 질문
+    greeting_completed: bool = False  # 인사 응답 완료 여부

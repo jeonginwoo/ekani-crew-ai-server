@@ -1,10 +1,16 @@
-from typing import Literal
+from dataclasses import dataclass
+from enum import Enum
 
-from pydantic import BaseModel
+class MessageRole(Enum):
+    USER = "user"
+    ASSISTANT = "assistant"
 
+class MessageSource(Enum):
+    HUMAN = "human"
+    AI = "ai"
 
-class MBTIMessage(BaseModel):
-    role: Literal["USER", "ASSISTANT"]
+@dataclass
+class MBTIMessage:
+    role: MessageRole
     content: str
-    question_type: Literal["NORMAL", "SUDDEN"]
-    source: Literal["HUMAN", "AI"]
+    source: MessageSource
