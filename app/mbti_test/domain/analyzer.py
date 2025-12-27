@@ -1,6 +1,5 @@
 import re
 
-# 키워드 + 가이드라인 가중치 통합 사전
 DICTIONARY = {
     "EI": {
         "E": [
@@ -63,38 +62,47 @@ DICTIONARY = {
         "T": [
             {"word": "이유", "w": 5}, {"word": "원인", "w": 5}, {"word": "논리", "w": 5},
             {"word": "분석", "w": 4}, {"word": "왜", "w": 5}, {"word": "해결", "w": 4},
-            {"word": "보험", "w": 5},
-            {"word": "합리", "w": 5}, {"word": "효율", "w": 4}, {"word": "객관", "w": 5},
-            {"word": "판단", "w": 4}, {"word": "평가", "w": 4}, {"word": "기준", "w": 4},
-            {"word": "정확", "w": 4}, {"word": "사실", "w": 3}, {"word": "증명", "w": 4},
-            {"word": "근거", "w": 5}, {"word": "타당", "w": 5}, {"word": "논증", "w": 5},
-            {"word": "결론", "w": 4}, {"word": "추론", "w": 4}, {"word": "인과", "w": 5},
-            {"word": "체계", "w": 4}, {"word": "구조", "w": 4}, {"word": "시스템", "w": 4},
-            {"word": "방법", "w": 3}, {"word": "전략", "w": 4}, {"word": "계획적", "w": 4},
-            {"word": "냉정", "w": 5}, {"word": "냉철", "w": 5}, {"word": "이성", "w": 5},
-            {"word": "실리", "w": 4}, {"word": "득실", "w": 5}, {"word": "손익", "w": 5},
-            {"word": "따져", "w": 5}, {"word": "계산", "w": 4}, {"word": "어떻게", "w": 4},
-            {"word": "방식", "w": 3}, {"word": "수단", "w": 4}, {"word": "절차", "w": 4},
-            {"word": "규칙", "w": 4}, {"word": "원리", "w": 4}, {"word": "법칙", "w": 4}
+            {"word": "보험", "w": 5}, {"word": "합리", "w": 5}, {"word": "효율", "w": 4},
+            {"word": "객관", "w": 5}, {"word": "판단", "w": 4}, {"word": "평가", "w": 4},
+            {"word": "기준", "w": 4}, {"word": "정확", "w": 4}, {"word": "사실", "w": 3},
+            {"word": "증명", "w": 4}, {"word": "근거", "w": 5}, {"word": "타당", "w": 5},
+            {"word": "논증", "w": 5}, {"word": "결론", "w": 4}, {"word": "추론", "w": 4},
+            {"word": "인과", "w": 5}, {"word": "체계", "w": 4}, {"word": "구조", "w": 4},
+            {"word": "시스템", "w": 4}, {"word": "방법", "w": 3}, {"word": "전략", "w": 4},
+            {"word": "계획적", "w": 4}, {"word": "냉정", "w": 5}, {"word": "냉철", "w": 5},
+            {"word": "이성", "w": 5}, {"word": "실리", "w": 4}, {"word": "득실", "w": 5},
+            {"word": "손익", "w": 5}, {"word": "따져", "w": 5}, {"word": "계산", "w": 4},
+            {"word": "어떻게", "w": 4}, {"word": "방식", "w": 3}, {"word": "수단", "w": 4},
+            {"word": "절차", "w": 4}, {"word": "규칙", "w": 4}, {"word": "원리", "w": 4},
+            {"word": "법칙", "w": 4}, {"word": "솔직히", "w": 3}, {"word": "어이없", "w": 4},
+            {"word": "황당", "w": 4}, {"word": "뭔말", "w": 3}, {"word": "당연", "w": 4},
+            {"word": "아니지", "w": 3}, {"word": "팩폭", "w": 5}, {"word": "직설", "w": 5},
+            {"word": "퍽이나", "w": 4}, {"word": "웃기", "w": 3}, {"word": "말도안", "w": 4},
+            {"word": "대신", "w": 3}, {"word": "해주", "w": 3}, {"word": "개선", "w": 5},
+            {"word": "수정", "w": 4}, {"word": "육하원칙", "w": 5}, {"word": "따라", "w": 3},
+            {"word": "비효율", "w": 5}, {"word": "최적", "w": 5}, {"word": "다르지않", "w": 4},
+            {"word": "에따라", "w": 3}
         ],
         "F": [
             {"word": "기분", "w": 5}, {"word": "마음", "w": 5}, {"word": "공감", "w": 5},
             {"word": "서운", "w": 4}, {"word": "감정", "w": 5}, {"word": "속상", "w": 5},
-            {"word": "어떡해", "w": 5},
-            {"word": "느낌", "w": 4}, {"word": "감성", "w": 5}, {"word": "정서", "w": 4},
-            {"word": "위로", "w": 5}, {"word": "힐링", "w": 5}, {"word": "따뜻", "w": 4},
-            {"word": "배려", "w": 5}, {"word": "존중", "w": 4}, {"word": "이해", "w": 4},
-            {"word": "고민", "w": 4}, {"word": "걱정", "w": 4}, {"word": "불안", "w": 4},
-            {"word": "슬픔", "w": 4}, {"word": "기쁨", "w": 3}, {"word": "행복", "w": 3},
-            {"word": "사랑", "w": 4}, {"word": "좋아", "w": 3}, {"word": "싫어", "w": 3},
-            {"word": "화나", "w": 4}, {"word": "짜증", "w": 4}, {"word": "답답", "w": 4},
-            {"word": "억울", "w": 5}, {"word": "미안", "w": 4}, {"word": "고마", "w": 4},
-            {"word": "감동", "w": 5}, {"word": "눈물", "w": 5}, {"word": "울", "w": 4},
-            {"word": "아픔", "w": 4}, {"word": "상처", "w": 5}, {"word": "치유", "w": 5},
-            {"word": "마음이", "w": 5}, {"word": "가슴", "w": 4}, {"word": "심정", "w": 5},
-            {"word": "감정적", "w": 5}, {"word": "인간적", "w": 5}, {"word": "따뜻한", "w": 5},
-            {"word": "공감해", "w": 5}, {"word": "위로해", "w": 5}, {"word": "힘들", "w": 4},
-            {"word": "안쓰러", "w": 5}, {"word": "불쌍", "w": 4}, {"word": "측은", "w": 5}
+            {"word": "어떡해", "w": 5}, {"word": "느낌", "w": 4}, {"word": "감성", "w": 5},
+            {"word": "정서", "w": 4}, {"word": "위로", "w": 5}, {"word": "힐링", "w": 5},
+            {"word": "따뜻", "w": 4}, {"word": "배려", "w": 5}, {"word": "존중", "w": 4},
+            {"word": "이해", "w": 4}, {"word": "고민", "w": 4}, {"word": "걱정", "w": 4},
+            {"word": "불안", "w": 4}, {"word": "슬픔", "w": 4}, {"word": "기쁨", "w": 3},
+            {"word": "행복", "w": 3}, {"word": "사랑", "w": 4}, {"word": "좋아", "w": 3},
+            {"word": "싫어", "w": 3}, {"word": "화나", "w": 4}, {"word": "짜증", "w": 4},
+            {"word": "답답", "w": 4}, {"word": "억울", "w": 5}, {"word": "미안", "w": 4},
+            {"word": "고마", "w": 4}, {"word": "감동", "w": 5}, {"word": "눈물", "w": 5},
+            {"word": "울", "w": 4}, {"word": "아픔", "w": 4}, {"word": "상처", "w": 5},
+            {"word": "치유", "w": 5}, {"word": "마음이", "w": 5}, {"word": "가슴", "w": 4},
+            {"word": "심정", "w": 5}, {"word": "감정적", "w": 5}, {"word": "인간적", "w": 5},
+            {"word": "따뜻한", "w": 5}, {"word": "공감해", "w": 5}, {"word": "위로해", "w": 5},
+            {"word": "힘들", "w": 4}, {"word": "안쓰러", "w": 5}, {"word": "불쌍", "w": 4},
+            {"word": "측은", "w": 5}, {"word": "기뻐", "w": 4}, {"word": "진심", "w": 4},
+            {"word": "우울", "w": 5}, {"word": "힘내", "w": 5}, {"word": "괜찮", "w": 4},
+            {"word": "응원", "w": 5}, {"word": "착하", "w": 3}
         ]
     },
     "JP": {
@@ -137,62 +145,46 @@ DICTIONARY = {
 DESCRIPTIONS = {
     "ISTP": {"title": "만능 재주꾼", "traits": ["#냉철함", "#해결사"], "desc": "사고 현장에서도 수리비부터 계산할 쿨한 해결사군요!"},
     "ENFP": {"title": "재기발랄한 활동가", "traits": ["#에너지", "#인싸"], "desc": "세상을 즐거움으로 채우는 당신은 자유로운 영혼입니다!"},
-    # (나머지 유형도 동일한 형식으로 추가 가능)
 }
 
 
 def apply_style_correction(ans: str, dim: str, scores: dict):
-    """
-    답변 스타일 기반 보정 (키워드 매칭 안됐을 때만 적용)
-    1. 문장 길이 분석
-    2. 감탄사/이모티콘 분석
-    3. 추상/구체 표현 분석
-    4. 불확실성 표현 분석
-    """
     ans_len = len(ans)
 
     if dim == "EI":
-        # 1. 문장 길이 - 긴 답변(설명 많음) = E 성향
         if ans_len > 50:
             scores["E"] += 1
-        # 짧고 간결 = I 성향
         elif ans_len < 20:
             scores["I"] += 1
 
     if dim == "SN":
-        # 3. 추상적 단어 빈도
         abstract_words = ["것", "거", "뭔가", "느낌", "같은", "듯"]
         abstract_count = sum(w in ans for w in abstract_words)
         if abstract_count >= 2:
             scores["N"] += 1
 
-        # 구체적 표현 (숫자, 단위)
         concrete_words = ["번", "개", "명", "시", "분", "회"]
         concrete_count = sum(w in ans for w in concrete_words)
         if concrete_count >= 2:
             scores["S"] += 1
 
     if dim == "TF":
-        # 의문문 많음 = T
         question_indicators = ans.count("?") + ans.count("어떻게") + ans.count("왜")
         if question_indicators >= 2:
             scores["T"] += 1
 
-        # 2. 감탄사/이모티콘 많음 = F
         exclamations = ["!", "ㅠ", "ㅜ", "ㅎ", "ㅋ", "♥", "❤", "😢", "😭", "💕"]
         exclamation_count = sum(ans.count(e) for e in exclamations)
         if exclamation_count >= 3:
-            scores["F"] += 2  # F는 명확하므로 2점
+            scores["F"] += 2
         elif exclamation_count >= 1:
             scores["F"] += 1
 
     if dim == "JP":
-        # 단정적 표현 = J
         decisive_words = ["해야", "할 거야", "할게", "예정", "반드시", "꼭"]
         if any(word in ans for word in decisive_words):
             scores["J"] += 1
 
-        # 4. 불확실성 표현 = P
         uncertain_words = ["아마", "글쎄", "모르겠", "될 듯", "일단", "어쩌면"]
         if sum(word in ans for word in uncertain_words) >= 1:
             scores["P"] += 1
@@ -201,7 +193,6 @@ def apply_style_correction(ans: str, dim: str, scores: dict):
 def calculate_partial_mbti(answers: list):
     scores = {k: 0 for k in "EISNTFJP"}
 
-    # Process only the answers provided so far
     for i, ans in enumerate(answers):
         dim = ""
         if i < 3:
@@ -218,14 +209,12 @@ def calculate_partial_mbti(answers: list):
 
         keyword_matched = False
 
-        # 1. 키워드 매칭
         for trait, keywords in DICTIONARY[dim].items():
             for k in keywords:
                 if isinstance(ans, str) and k["word"] in ans:
                     scores[trait] += k["w"]
                     keyword_matched = True
 
-        # 2. 패턴 매칭 (정규표현식)
         if isinstance(ans, str):
             if dim == "SN":
                 if re.search(r"만약에|~라면|어쩌면|언젠가|미래에|가능성|상상", ans):
@@ -251,33 +240,27 @@ def calculate_partial_mbti(answers: list):
                     scores["P"] += 3
                     keyword_matched = True
 
-        # 3. 키워드 매칭 안됐을 때만 스타일 보정 적용
         if not keyword_matched and isinstance(ans, str):
             apply_style_correction(ans, dim, scores)
 
-    # 결과 계산 (부분적으로만 계산)
     partial_mbti = ""
 
     if answers and len(answers) > 0:
-        # EI
         if len(answers) >= 3:
             partial_mbti += ("E" if scores["E"] >= scores["I"] else "I")
         else:
             partial_mbti += "X"
 
-        # SN
         if len(answers) >= 6:
             partial_mbti += ("S" if scores["S"] >= scores["N"] else "N")
         else:
             partial_mbti += "X"
 
-        # TF
         if len(answers) >= 9:
             partial_mbti += ("T" if scores["T"] >= scores["F"] else "F")
         else:
             partial_mbti += "X"
 
-        # JP
         if len(answers) >= 12:
             partial_mbti += ("J" if scores["J"] >= scores["P"] else "P")
         else:
@@ -296,14 +279,12 @@ def run_analysis(answers: list):
 
         keyword_matched = False
 
-        # 1. 키워드 매칭
         for trait, keywords in DICTIONARY[dim].items():
             for k in keywords:
                 if k["word"] in ans:
                     scores[trait] += k["w"]
                     keyword_matched = True
 
-        # 2. 패턴 매칭 (정규표현식)
         if dim == "SN":
             if re.search(r"만약에|~라면|어쩌면|언젠가|미래에|가능성|상상", ans):
                 scores["N"] += 3
@@ -328,11 +309,9 @@ def run_analysis(answers: list):
                 scores["P"] += 3
                 keyword_matched = True
 
-        # 3. 키워드 매칭 안됐을 때만 스타일 보정 적용
         if not keyword_matched:
             apply_style_correction(ans, dim, scores)
 
-    # 결과 계산
     res_mbti = (
             ("E" if scores["E"] >= scores["I"] else "I") +
             ("S" if scores["S"] >= scores["N"] else "N") +
