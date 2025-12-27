@@ -189,6 +189,8 @@ Person C,D ─→ 버그 픽스, UX 개선
   - **API**: `POST /mbti/surprise/answer` → MBTI 보정 결과
   - **✅ 인수 조건**: 응답 분석 후 MBTI 보정 (예: ESTJ → ISTJ)
 
+---
+
 #### Matching Domain (Team Match)
 
 - [x] `MATCH-1` [Matching] 사용자로서, 매칭 대기열에 등록하고 싶다
@@ -207,6 +209,43 @@ Person C,D ─→ 버그 픽스, UX 개선
   - **UseCase 확장**: 매칭 전 횟수 체크
   - **API 확장**: 잔여 횟수 반환, 초과 시 402 에러
   - **✅ 인수 조건**: 3회 초과 시 에러, 자정에 리셋
+
+### Week 3: 매칭 고도화
+
+> **목표**: MBTI 기반 매칭 알고리즘으로 매칭 품질 개선
+
+#### MBTI 기반 매칭 알고리즘 (Team MBTI)
+
+- [ ] `MATCH-4` [Matching] 사용자로서, MBTI 궁합이 좋은 사람과 매칭되고 싶다
+  - **Domain**: `MBTICompatibility` - 궁합 점수 계산
+  - **UseCase**: `CompatibilityMatchUseCase` - 궁합 기반 매칭
+  - **API**: `POST /matching/compatibility` → MBTI 궁합 매칭
+  - **✅ 인수 조건**: 궁합 점수 높은 순 매칭
+
+- [ ] `MATCH-5` [Matching] 사용자로서, 나와 비슷한 MBTI 사람과 매칭되고 싶다
+  - **UseCase**: `SimilarMBTIMatchUseCase`
+  - **API**: `POST /matching/similar` → 유사 MBTI 매칭
+  - **✅ 인수 조건**: 같은/유사 MBTI 우선 매칭
+
+#### 인프라 (실시간 알림 / 멀티 서버 / 배포)
+
+- [ ] `MATCH-6` [Matching] 대기 중인 사용자가 매칭되면 즉시 알림을 받고 싶다
+  - **현재 문제**: 폴링 방식으로 최대 3초 딜레이 발생
+  - **해결**: WebSocket으로 매칭 대기 → 매칭 시 서버에서 즉시 push
+  - **API**: `WS /ws/matching/{user_id}` → 매칭 대기 및 알림
+  - **✅ 인수 조건**: 매칭 즉시 양쪽 사용자에게 알림
+
+- [ ] `MATCH-7` [Matching] 서버가 여러 대일 때도 매칭 알림이 전달되어야 한다
+  - **해결**: Redis Pub/Sub으로 매칭 알림 브로드캐스트
+  - **구조**: `User A 매칭 요청 → User B 매칭됨 → Redis Pub → User B의 서버 → WebSocket 알림`
+  - **✅ 인수 조건**: 다른 서버에서 대기 중인 사용자에게도 매칭 알림
+
+- [ ] `MATCH-8` [Matching] 배포 후에도 유저 상태가 정리되어야 한다
+  - **현재 문제**: 배포 시 인메모리 상태 손실, Redis 상태는 남음
+  - **해결**: CHATTING 상태에 TTL 추가 + 프론트 heartbeat로 갱신
+  - **✅ 인수 조건**: 5분간 heartbeat 없으면 상태 자동 만료
+
+---
 
 #### Chat Domain (Team Match)
 
@@ -237,26 +276,44 @@ Person C,D ─→ 버그 픽스, UX 개선
   - **API**: `GET /chat/rooms` → 내 채팅방 목록
   - **✅ 인수 조건**: DB에서 채팅방 목록 조회, 최근 메시지 미리보기, 안 읽은 메시지 카운트
 
----
+#### 채팅방 관리 (MVP 필수)
 
-### Week 3: 매칭 고도화
+- [ ] `CHAT-5` [Chat] 사용자로서, 채팅방을 나가고 싶다
+  - **Domain 확장**: `ChatRoom.status` (active, left_by_user1, left_by_user2, closed)
+  - **UseCase**: `LeaveChatRoomUseCase` - 채팅방 나가기
+  - **API**: `POST /chat/{room_id}/leave` → 채팅방 나가기
+  - **✅ 인수 조건**: 나간 유저는 목록에서 안 보임, 상대방에게 "상대방이 나갔습니다" 표시
 
-> **목표**: MBTI 기반 매칭 알고리즘으로 매칭 품질 개선
+- [ ] `CHAT-6` [Chat] 사용자로서, 불쾌한 상대를 신고하고 싶다
+  - **Domain**: `Report` (id, reporter_id, reported_user_id, room_id, reason, created_at)
+  - **UseCase**: `ReportUserUseCase` - 유저 신고
+  - **API**: `POST /chat/{room_id}/report` → 신고 접수
+  - **✅ 인수 조건**: 신고 사유 선택, 관리자 검토용 DB 저장
 
-#### MBTI 기반 매칭 알고리즘 (Team MBTI)
+- [ ] `CHAT-7` [Chat] 사용자로서, 특정 유저를 차단하고 싶다
+  - **Domain**: `Block` (id, blocker_id, blocked_user_id, created_at)
+  - **UseCase**: `BlockUserUseCase` - 유저 차단
+  - **API**: `POST /user/{user_id}/block` → 유저 차단
+  - **✅ 인수 조건**: 차단한 유저와 매칭 안 됨, 기존 채팅방 비활성화
 
-- [ ] `MATCH-4` [Matching] 사용자로서, MBTI 궁합이 좋은 사람과 매칭되고 싶다
-  - **Domain**: `MBTICompatibility` - 궁합 점수 계산
-  - **UseCase**: `CompatibilityMatchUseCase` - 궁합 기반 매칭
-  - **API**: `POST /matching/compatibility` → MBTI 궁합 매칭
-  - **✅ 인수 조건**: 궁합 점수 높은 순 매칭
+- [ ] `CHAT-8` [Chat] 사용자로서, 채팅이 끝난 후 상대방을 평가하고 싶다
+  - **Domain**: `Rating` (id, rater_id, rated_user_id, room_id, score, feedback, created_at)
+  - **UseCase**: `RateUserUseCase` - 상대 평가
+  - **API**: `POST /chat/{room_id}/rate` → 평가 제출
+  - **✅ 인수 조건**: 1-5점 별점, 선택적 피드백, 채팅방당 1회만 평가 가능
 
-- [ ] `MATCH-5` [Matching] 사용자로서, 나와 비슷한 MBTI 사람과 매칭되고 싶다
-  - **UseCase**: `SimilarMBTIMatchUseCase`
-  - **API**: `POST /matching/similar` → 유사 MBTI 매칭
-  - **✅ 인수 조건**: 같은/유사 MBTI 우선 매칭
+#### 인프라 (멀티 서버 / 배포)
 
----
+- [ ] `CHAT-9` [Chat] 서버가 여러 대일 때도 채팅 메시지가 전달되어야 한다
+  - **현재 문제**: `ConnectionManager`가 인메모리라 서버 간 브로드캐스트 불가
+  - **해결**: Redis Pub/Sub으로 메시지 브로드캐스트
+  - **구조**: `User A (Server 1) → Redis Pub → Server 2 → User B`
+  - **✅ 인수 조건**: 다른 서버에 연결된 사용자에게도 메시지 전달
+
+- [ ] `CHAT-10` [Chat] 배포 시 WebSocket 연결이 끊겨도 자동 재연결되어야 한다
+  - **현재 문제**: 배포 시 모든 WebSocket 연결 끊김, 사용자가 수동 새로고침 필요
+  - **해결 (Frontend)**: WebSocket `onclose` 시 자동 재연결 로직
+  - **✅ 인수 조건**: 연결 끊김 후 3초 내 자동 재연결, 재연결 시 히스토리 유지
 
 ### Week 4: 그로스 해킹
 
@@ -290,45 +347,6 @@ Person C,D ─→ 버그 픽스, UX 개선
 - [ ] `PAY-2` [Payment] 사용자로서, 간편하게 결제하고 싶다
   - **Adapter**: 결제 API 연동
   - **✅ 인수 조건**: 실결제 처리, 결제 내역 저장
-
----
-
-### 인프라 개선 (스케일업 대비)
-
-> **목표**: 멀티 서버 환경 대응 및 배포 안정성 확보
-
-#### 실시간 매칭 알림
-
-- [ ] `MATCH-6` [Matching] 대기 중인 사용자가 매칭되면 즉시 알림을 받고 싶다
-  - **현재 문제**: 폴링 방식으로 최대 3초 딜레이 발생
-  - **해결**: WebSocket으로 매칭 대기 → 매칭 시 서버에서 즉시 push
-  - **API**: `WS /ws/matching/{user_id}` → 매칭 대기 및 알림
-  - **✅ 인수 조건**: 매칭 즉시 양쪽 사용자에게 알림
-
-#### 멀티 서버 지원 (Redis Pub/Sub)
-
-- [ ] `CHAT-5` [Chat] 서버가 여러 대일 때도 채팅 메시지가 전달되어야 한다
-  - **현재 문제**: `ConnectionManager`가 인메모리라 서버 간 브로드캐스트 불가
-  - **해결**: Redis Pub/Sub으로 메시지 브로드캐스트
-  - **구조**: `User A (Server 1) → Redis Pub → Server 2 → User B`
-  - **✅ 인수 조건**: 다른 서버에 연결된 사용자에게도 메시지 전달
-
-- [ ] `MATCH-7` [Matching] 서버가 여러 대일 때도 매칭 알림이 전달되어야 한다
-  - **해결**: Redis Pub/Sub으로 매칭 알림 브로드캐스트
-  - **구조**: `User A 매칭 요청 → User B 매칭됨 → Redis Pub → User B의 서버 → WebSocket 알림`
-  - **✅ 인수 조건**: 다른 서버에서 대기 중인 사용자에게도 매칭 알림
-
-#### 배포 안정성
-
-- [ ] `CHAT-6` [Chat] 배포 시 WebSocket 연결이 끊겨도 자동 재연결되어야 한다
-  - **현재 문제**: 배포 시 모든 WebSocket 연결 끊김, 사용자가 수동 새로고침 필요
-  - **해결 (Frontend)**: WebSocket `onclose` 시 자동 재연결 로직
-  - **✅ 인수 조건**: 연결 끊김 후 3초 내 자동 재연결, 재연결 시 히스토리 유지
-
-- [ ] `MATCH-8` [Matching] 배포 후에도 유저 상태가 정리되어야 한다
-  - **현재 문제**: 배포 시 인메모리 상태 손실, Redis 상태는 남음
-  - **해결**: CHATTING 상태에 TTL 추가 + 프론트 heartbeat로 갱신
-  - **✅ 인수 조건**: 5분간 heartbeat 없으면 상태 자동 만료
 
 ---
 
