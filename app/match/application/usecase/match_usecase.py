@@ -29,28 +29,22 @@ class MatchUseCase:
         """
         유저의 매칭 요청을 처리합니다 (Enqueue).
         """
-        # Check if user is already matched or chatting
+        # Check if user was just matched (waiting to connect to chat room)
+        # Note: CHATTING state does NOT block new matches - users can have multiple chat rooms
         if self.match_state:
             user_state = await self.match_state.get_state(user_id)
-            if user_state:
-                if user_state.state == MatchState.MATCHED:
-                    return {
-                        "status": "already_matched",
-                        "message": "이미 매칭되었습니다. 채팅방에 입장해주세요.",
-                        "roomId": user_state.room_id,
-                        "my_mbti": mbti.value,
-                        "partner": {
-                            "user_id": user_state.partner_id,
-                            "mbti": None  # We don't store partner's MBTI in state
-                        }
+            if user_state and user_state.state == MatchState.MATCHED:
+                # User was just matched, should connect to that chat room first
+                return {
+                    "status": "already_matched",
+                    "message": "이미 매칭되었습니다. 채팅방에 입장해주세요.",
+                    "roomId": user_state.room_id,
+                    "my_mbti": mbti.value,
+                    "partner": {
+                        "user_id": user_state.partner_id,
+                        "mbti": None  # We don't store partner's MBTI in state
                     }
-                elif user_state.state == MatchState.CHATTING:
-                    return {
-                        "status": "already_chatting",
-                        "message": "이미 채팅 중입니다.",
-                        "roomId": user_state.room_id,
-                        "my_mbti": mbti.value
-                    }
+                }
 
         if await self.match_queue.is_user_in_queue(user_id, mbti):
             wait_count = await self.get_waiting_count(mbti)

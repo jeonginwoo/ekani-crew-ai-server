@@ -117,14 +117,15 @@ class RedisMatchStateAdapter(MatchStatePort):
         User is available if:
         - No state exists (idle)
         - State is QUEUED (waiting in queue)
+        - State is CHATTING (user can have multiple chat rooms)
 
         User is NOT available if:
-        - State is MATCHED (already matched, waiting to connect)
-        - State is CHATTING (already in chat)
+        - State is MATCHED (already matched, waiting to connect to NEW chat room)
         """
         state = await self.get_state(user_id)
 
         if state is None:
             return True
 
-        return state.state in [MatchState.IDLE, MatchState.QUEUED]
+        # Only MATCHED state blocks - user should connect to that chat first
+        return state.state != MatchState.MATCHED
