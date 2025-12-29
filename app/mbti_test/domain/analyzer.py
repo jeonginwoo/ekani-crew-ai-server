@@ -270,57 +270,137 @@ def analyze_linguistic_detail(ans: str, dim: str, scores: dict):
         if re.search(r"글쎄|아마|몰라|일단|그냥|봐서", clean_ans): scores["P"] += 2
 
 
+# ==========================================================
+# [수정] 3. 분석 로직 (미감지 시 N+1 보정 추가)
+# ==========================================================
+
 def calculate_partial_mbti(answers: list):
     scores = {k: 0 for k in "EISNTFJP"}
 
     for i, ans in enumerate(answers):
-        # 현재 질문의 의도된 차원 (가중치를 더 주기 위해 사용)
         target_dim = get_dimension_for_question(i)
 
+        # 안전한 문자열 처리
         if not isinstance(ans, str) or not ans: continue
 
-        # =======================================================
-        # [핵심 변경] 질문 의도와 상관없이 "모든 딕셔너리"를 다 뒤짐
-        # =======================================================
+        # [플래그] 이번 답변이 키워드나 패턴에 걸렸는지 확인
+        is_detected = False
+
+        # 1. 전차원 교차 분석 (Dictionary Scanning)
         for dim_key, traits in DICTIONARY.items():
             for trait, keyword_list in traits.items():
                 for k in keyword_list:
                     if k["word"] in ans:
-                        # 질문 의도와 맞는 키워드면 점수 100%, 아니면(교차 분석) 100% 다 줌 (누적 중요)
                         scores[trait] += k["w"]
+                        is_detected = True  # 감지됨!
 
-        # -------------------------------------------------------
-        # [정밀 분석] 정규식 & 스타일 분석도 "모든 차원"에 대해 실행
-        # -------------------------------------------------------
-        # 1. SN 패턴 (질문이 EI여도 답변에 '만약에'가 있으면 N 점수 획득)
-        if re.search(r"만약에|~라면|상상|미래|혹시", ans): scores["N"] += 3
-        if re.search(r"현실|당장|팩트|실제", ans): scores["S"] += 3
+        # 2. 정규식 패턴 분석 (Regex Scanning)
+        # [SN]
+        if re.search(r"만약에|~라면|상상|미래|혹시", ans):
+            scores["N"] += 3;
+            is_detected = True
+        if re.search(r"현실|당장|팩트|실제", ans):
+            scores["S"] += 3;
+            is_detected = True
 
-        # 2. TF 패턴
-        if re.search(r"왜|이유|논리|따져", ans): scores["T"] += 4
-        if re.search(r"속상|서운|어떡해|마음|기쁨|행복", ans): scores["F"] += 4  # '기쁨' 추가
+        # [TF]
+        if re.search(r"왜|이유|논리|따져", ans):
+            scores["T"] += 4;
+            is_detected = True
+        if re.search(r"속상|서운|어떡해|마음|기쁨|행복", ans):
+            scores["F"] += 4;
+            is_detected = True
 
-        # 3. JP 패턴 (여기가 님의 답변 '계획'을 잡아낼 곳!)
-        if re.search(r"계획|미리|체크|일정", ans): scores["J"] += 3
-        if re.search(r"봐서|그때|일단|그냥", ans): scores["P"] += 3
+        # [JP]
+        if re.search(r"계획|미리|체크|일정", ans):
+            scores["J"] += 3;
+            is_detected = True
+        if re.search(r"봐서|그때|일단|그냥", ans):
+            scores["P"] += 3;
+            is_detected = True
 
-        # 4. 언어 정밀 분석 (말투 보정) - 이것도 모든 차원 다 돌림
+        # =======================================================
+        # [NEW] 3. 최후의 보루: 아무것도 안 잡혔으면 N(추상) +1
+        # =======================================================
+        if not is_detected:
+            # "뭔가 감지가 안 되는 묘한 답변 -> 추상적(N)일 확률 높음"
+            scores["N"] += 1
+
+            # 4. 정밀 언어 분석 (보정은 보정대로 계속 수행)
+        # (N+1을 받았더라도, 말투에서 I나 P가 감지될 수 있으므로 수행)
         analyze_linguistic_detail(ans, "EI", scores)
         analyze_linguistic_detail(ans, "SN", scores)
         analyze_linguistic_detail(ans, "TF", scores)
         analyze_linguistic_detail(ans, "JP", scores)
 
-    # ... (결과 계산 부분은 기존 동일) ...
-
-    # 결과 반환
+    # 결과 문자열 계산 (기존과 동일)
     partial_mbti = ""
-    # (간략화된 예시)
-    partial_mbti += ("E" if scores["E"] >= scores["I"] else "I")
-    partial_mbti += ("S" if scores["S"] >= scores["N"] else "N")
-    partial_mbti += ("T" if scores["T"] >= scores["F"] else "F")
-    partial_mbti += ("J" if scores["J"] >= scores["P"] else "P")
+    if answers:
+        if len(answers) >= 3:
+            partial_mbti += ("E" if scores["E"] >= scores["I"] else "I")
+        else:
+            partial_mbti += "X"
+        if len(answers) >= 6:
+            partial_mbti += ("S" if scores["S"] >= scores["N"] else "N")
+        else:
+            partial_mbti += "X"
+        if len(answers) >= 9:
+            partial_mbti += ("T" if scores["T"] >= scores["F"] else "F")
+        else:
+            partial_mbti += "X"
+        if len(answers) >= 12:
+            partial_mbti += ("J" if scores["J"] >= scores["P"] else "P")
+        else:
+            partial_mbti += "X"
+    else:
+        partial_mbti = "XXXX"
 
     return {"mbti": partial_mbti, "scores": scores}
+
+
+def analyze_single_answer(answer: str, dimension: str) -> dict:
+    """단일 답변 분석에도 동일한 N+1 로직 적용"""
+    scores = {k: 0 for k in dimension}  # 예: {'S':0, 'N':0}
+    is_detected = False  # 감지 여부 플래그
+
+    # 1. 키워드 매칭
+    if dimension in DICTIONARY:
+        for trait, keywords in DICTIONARY[dimension].items():
+            for k in keywords:
+                if k["word"] in answer:
+                    scores[trait] += k["w"]
+                    is_detected = True
+
+    # 2. 패턴 매칭
+    if dimension == "SN":
+        if re.search(r"만약에|~라면|상상|미래", answer): scores["N"] += 3; is_detected = True
+        if re.search(r"현실|당장|팩트|실제", answer): scores["S"] += 3; is_detected = True
+    if dimension == "TF":
+        if re.search(r"왜|이유|논리|따져", answer): scores["T"] += 4; is_detected = True
+        if re.search(r"속상|서운|어떡해|마음", answer): scores["F"] += 4; is_detected = True
+    if dimension == "JP":
+        if re.search(r"계획|체크|리스트", answer): scores["J"] += 3; is_detected = True
+        if re.search(r"봐서|그때|일단", answer): scores["P"] += 3; is_detected = True
+
+    # =======================================================
+    # [NEW] 3. 미감지 시 N+1 (SN 차원 질문이 아니더라도 전체 점수판엔 없지만,
+    # 여기선 단일 차원 분석이므로 'N' 키워드가 있는 dimension일 때만 적용)
+    # =======================================================
+    if not is_detected and "N" in scores:
+        scores["N"] += 1
+
+    # 4. 정밀 분석 (보정)
+    analyze_linguistic_detail(answer, dimension, scores)
+
+    # 결과 산출
+    trait1, trait2 = tuple(dimension)
+    score1 = scores.get(trait1, 0)
+    score2 = scores.get(trait2, 0)
+
+    side = trait1 if score1 >= score2 else trait2
+    score = score1 if score1 >= score2 else score2
+
+    return {"scores": scores, "side": side, "score": score}
 
 
 def analyze_single_answer(answer: str, dimension: str) -> dict:
