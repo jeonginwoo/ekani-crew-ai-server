@@ -74,9 +74,13 @@ def _build_user_prompt(command: GenerateAIQuestionCommand) -> str:
     targets = _turn_target_dimensions(command.turn)
     mode_line = (
         "질문 모드: 돌발(surprise)\n"
-        "- 질문에는 반드시 '예상 밖 상황/제약'을 1개 이상 포함해라. (시간 압박/역할 강제/갑작스런 변수/낯선 사람·환경)\n"
-        "- 평범한 MBTI 질문(모임이 좋나, 혼자가 좋나 등)으로 묻지 마라.\n"
-        "- 사용자가 둘 중 하나를 선택해야 하는 형태로 묻고, 이유 + 실제 경험 예시 1개를 요구해라.\n"
+        "- 각 질문에 반드시 '예상 밖 상황/제약' 1개 이상 포함(예: 시간 압박, 갑작스런 변수, 낯선 장소·사람, 역할 강제).\n"
+        "- 평범한 MBTI 질문(모임이 좋나/혼자가 좋나 등) 금지. 테스트 티 안 나게 일상/상황형으로 위장.\n"
+        "- 사용자가 둘 중 하나를 선택해야 하는 형태로 묻고, 선택 이유 + 실제 경험 예시 1개를 요청.\n"
+        "- 차원은 최소 1개만 겨냥(E/I, S/N, T/F, J/P 중 택1); target_dimensions에 명시.\n"
+        "- 한국어 캐주얼 반말 + 이모지 1~2개, 2~3문장, 물음표로 끝내.\n"
+        '- JSON만 반환: {"questions":[{"text":"...", "target_dimensions":["E/I"]}, {"text":"...", "target_dimensions":["S/N"]}], "turn": <int>}\n'
+        "- 직전 3개 질문/답변과 다른 소재·상황을 사용해 중복 회피.\n"
         if command.question_mode == "surprise"
         else
         "질문 모드: 일반(normal)\n"
