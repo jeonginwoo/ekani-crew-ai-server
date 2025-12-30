@@ -4,7 +4,8 @@ from typing import Dict
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
-
+from sqlalchemy.orm import Session
+from config.database import SessionLocal
 from app.auth.adapter.input.web.auth_dependency import get_current_user_id
 from app.mbti_test.application.port.input.start_mbti_test_use_case import StartMBTITestCommand
 from app.mbti_test.application.port.input.answer_question_use_case import AnswerQuestionCommand
@@ -12,9 +13,10 @@ from app.mbti_test.application.use_case.start_mbti_test_service import StartMBTI
 from app.mbti_test.application.use_case.answer_question_service import AnswerQuestionService
 from app.mbti_test.application.port.output.mbti_test_session_repository import MBTITestSessionRepositoryPort
 from app.mbti_test.application.port.ai_question_provider_port import AIQuestionProviderPort
-from app.mbti_test.infrastructure.repository.in_memory_mbti_test_session_repository import InMemoryMBTITestSessionRepository
+from app.mbti_test.adapter.output.mysql_mbti_test_session_repository import MySQLMBTITestSessionRepository
 from app.mbti_test.infrastructure.service.human_question_provider import HumanQuestionProvider
 from app.mbti_test.adapter.output.openai_ai_question_provider import create_openai_question_provider_from_settings
+from app.mbti_test.adapter.output.mysql_user_repository import MySQLUserRepository
 
 # 결과 조회용 DI + UseCase + Exceptions
 from app.mbti_test.infrastructure.di import get_calculate_final_mbti_usecase
@@ -24,31 +26,31 @@ from app.mbti_test.application.port.output.user_repository_port import UserRepos
 
 mbti_router = APIRouter()
 
-# DI (현재는 인메모리, 필요 시 MySQL Repo로 교체)
-_session_repository = InMemoryMBTITestSessionRepository()
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+def get_session_repository(db: Session = Depends(get_db)) -> MBTITestSessionRepositoryPort:
+    return MySQLMBTITestSessionRepository(db=db)
 
-class InMemoryUserRepository(UserRepositoryPort):
-    def __init__(self):
-        self.mbti_map = {}
-    def update_mbti(self, user_id: uuid.UUID, mbti: str) -> None:
-        self.mbti_map[str(user_id)] = mbti
-
-_user_repository = InMemoryUserRepository()
-#InMemoryUserRepository 인메모리 세션/유저 저장소 추가  ⬇️ (MySQL 대신 메모리로 통일)
-def get_session_repository() -> MBTITestSessionRepositoryPort:
-    return _session_repository
+def get_user_repository(db: Session = Depends(get_db)) -> UserRepositoryPort:
+    return MySQLUserRepository(db=db)
 
 def get_human_question_provider() -> HumanQuestionProvider:
     return HumanQuestionProvider()
 
 def get_ai_question_provider() -> AIQuestionProviderPort:
     return create_openai_question_provider_from_settings()
-# 결과 계산도 인메모리로 사용하도록 DI 추가  ⬇️
-def get_calculate_final_mbti_usecase_inmemory() -> CalculateFinalMBTIUseCase:
+
+def get_calculate_final_mbti_usecase_mysql(
+    db: Session = Depends(get_db),
+) -> CalculateFinalMBTIUseCase:
     return CalculateFinalMBTIUseCase(
-        session_repo=_session_repository,
-        user_repo=_user_repository,
-        required_answers=12,  # 필요 시 24 → 12로 변경한 값 유지
+        session_repo=MySQLMBTITestSessionRepository(db=db),
+        user_repo=MySQLUserRepository(db=db),
+        required_answers=12,  # 필요 시 24로 조정
     )
 
 # ... /start, /chat은 동일하게 _session_repository 사용 ...
@@ -134,7 +136,7 @@ async def answer_question_chat(
 @mbti_router.get("/result/{mbti_session_id}", response_model=MBTIResultResponse)
 def get_result(
     mbti_session_id: uuid.UUID,
-    use_case: CalculateFinalMBTIUseCase = Depends(get_calculate_final_mbti_usecase_inmemory),  # ⬅️ 인메모리 DI로 교체
+    use_case: CalculateFinalMBTIUseCase = Depends(get_calculate_final_mbti_usecase_mysql),  # ⬅️ 인메모리 DI로 교체
 ):
     try:
         result = use_case.execute(session_id=mbti_session_id)
