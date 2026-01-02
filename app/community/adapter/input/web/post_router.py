@@ -4,9 +4,23 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.community.application.port.comment_repository_port import CommentRepositoryPort
 from app.community.application.port.post_repository_port import PostRepositoryPort
+from app.community.application.use_case.add_comment_use_case import AddCommentUseCase
+from app.community.application.use_case.get_comments_use_case import (
+    GetCommentsUseCase,
+)
 from app.community.domain.post import Post, PostType
-from app.community.infrastructure.repository.mysql_post_repository import MySQLPostRepository
+from app.community.infrastructure.repository.mysql_comment_repository import (
+    MySQLCommentRepository,
+)
+from app.community.infrastructure.repository.mysql_post_repository import (
+    MySQLPostRepository,
+)
+from app.user.application.port.user_repository_port import UserRepositoryPort
+from app.user.infrastructure.repository.mysql_user_repository import (
+    MySQLUserRepository,
+)
 from config.database import get_db
 
 
@@ -15,6 +29,14 @@ post_router = APIRouter()
 
 def get_post_repository(db: Session = Depends(get_db)) -> PostRepositoryPort:
     return MySQLPostRepository(db)
+
+
+def get_comment_repository(db: Session = Depends(get_db)) -> CommentRepositoryPort:
+    return MySQLCommentRepository(db)
+
+
+def get_user_repository(db: Session = Depends(get_db)) -> UserRepositoryPort:
+    return MySQLUserRepository(db)
 
 
 class CreatePostRequest(BaseModel):
@@ -128,3 +150,96 @@ def get_post(
         topic_id=post.topic_id,
         created_at=post.created_at,
     )
+
+
+# ================= Comment Endpoints =================
+
+
+class CreateCommentRequest(BaseModel):
+    author_id: str
+    content: str
+
+
+class CommentResponse(BaseModel):
+    id: str
+    post_id: str
+    author_id: str
+    author_mbti: str | None
+    content: str
+    created_at: datetime
+
+
+class CommentListResponse(BaseModel):
+    items: list[CommentResponse]
+
+
+@post_router.post("/posts/{post_id}/comments", status_code=status.HTTP_201_CREATED)
+def create_comment(
+    post_id: str,
+    request: CreateCommentRequest,
+    post_repo: PostRepositoryPort = Depends(get_post_repository),
+    comment_repo: CommentRepositoryPort = Depends(get_comment_repository),
+) -> CommentResponse:
+    """댓글 작성"""
+    use_case = AddCommentUseCase(
+        comment_repository=comment_repo,
+        post_repository=post_repo,
+    )
+
+    try:
+        comment_id = use_case.execute(
+            post_id=post_id,
+            author_id=request.author_id,
+            content=request.content,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+    return CommentResponse(
+        id=comment_id,
+        post_id=post_id,
+        author_id=request.author_id,
+        author_mbti=None,
+        content=request.content,
+        created_at=datetime.now(),
+    )
+
+
+@post_router.get("/posts/{post_id}/comments")
+def get_comments(
+    post_id: str,
+    post_repo: PostRepositoryPort = Depends(get_post_repository),
+    comment_repo: CommentRepositoryPort = Depends(get_comment_repository),
+    user_repo: UserRepositoryPort = Depends(get_user_repository),
+) -> CommentListResponse:
+    """게시글 댓글 목록 조회"""
+    use_case = GetCommentsUseCase(
+        comment_repository=comment_repo,
+        post_repository=post_repo,
+        user_repository=user_repo,
+    )
+
+    try:
+        comments = use_case.execute(post_id=post_id)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+    items = [
+        CommentResponse(
+            id=comment.id,
+            post_id=comment.post_id,
+            author_id=comment.author_id,
+            author_mbti=comment.author_mbti,
+            content=comment.content,
+            created_at=comment.created_at,
+        )
+        for comment in comments
+    ]
+
+    return CommentListResponse(items=items)

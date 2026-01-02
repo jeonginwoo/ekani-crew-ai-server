@@ -334,7 +334,7 @@ Person C,D ─→ 버그 픽스, UX 개선
 
 ##### 댓글 기능
 
-- [ ] `COMM-5` [Community] 사용자로서, 게시글에 댓글을 달고 싶다
+- [x] `COMM-5` [Community] 사용자로서, 게시글에 댓글을 달고 싶다
   - **Domain**: `Comment` (id, post_id, author_id, content, created_at)
   - **UseCase**: `AddCommentUseCase` - 댓글 작성
   - **API**: `POST /community/posts/{post_id}/comments` → 댓글 작성
