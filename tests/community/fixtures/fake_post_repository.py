@@ -21,3 +21,25 @@ class FakePostRepository(PostRepositoryPort):
     def find_by_post_type(self, post_type: PostType) -> list[Post]:
         posts = [p for p in self._posts.values() if p.post_type == post_type]
         return sorted(posts, key=lambda p: p.created_at, reverse=True)
+
+    def count_all(self) -> int:
+        return len(self._posts)
+
+    def count_by_post_type(self, post_type: PostType) -> int:
+        return len([p for p in self._posts.values() if p.post_type == post_type])
+
+    def find_paginated(
+        self,
+        page: int,
+        size: int,
+        post_type: PostType | None = None,
+    ) -> list[Post]:
+        if post_type:
+            posts = [p for p in self._posts.values() if p.post_type == post_type]
+        else:
+            posts = list(self._posts.values())
+
+        sorted_posts = sorted(posts, key=lambda p: p.created_at, reverse=True)
+        start = (page - 1) * size
+        end = start + size
+        return sorted_posts[start:end]

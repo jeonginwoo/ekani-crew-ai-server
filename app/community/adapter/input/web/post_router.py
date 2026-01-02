@@ -64,6 +64,48 @@ def create_post(
     )
 
 
+class PostListResponse(BaseModel):
+    items: list[PostResponse]
+    total: int
+    page: int
+    size: int
+
+
+@post_router.get("/posts")
+def get_posts(
+    type: str | None = None,
+    page: int = 1,
+    size: int = 10,
+    post_repo: PostRepositoryPort = Depends(get_post_repository),
+) -> PostListResponse:
+    """게시글 목록 조회 (필터링, 페이지네이션)"""
+    post_type = None
+    if type:
+        post_type = PostType.TOPIC if type == "topic" else PostType.FREE
+
+    posts = post_repo.find_paginated(page=page, size=size, post_type=post_type)
+
+    if post_type:
+        total = post_repo.count_by_post_type(post_type)
+    else:
+        total = post_repo.count_all()
+
+    items = [
+        PostResponse(
+            id=post.id,
+            author_id=post.author_id,
+            title=post.title,
+            content=post.content,
+            post_type=post.post_type.value,
+            topic_id=post.topic_id,
+            created_at=post.created_at,
+        )
+        for post in posts
+    ]
+
+    return PostListResponse(items=items, total=total, page=page, size=size)
+
+
 @post_router.get("/posts/{post_id}")
 def get_post(
     post_id: str,

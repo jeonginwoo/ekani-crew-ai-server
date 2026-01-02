@@ -314,7 +314,7 @@ Person C,D ─→ 버그 픽스, UX 개선
   - **API**: `GET /community/posts/{post_id}` → 게시글 상세 (SEO용 고유 URL)
   - **✅ 인수 조건**: 토픽 글(topic_id 연결) or 자유 글 선택, 작성자 MBTI 표시
 
-- [ ] `COMM-3` [Community] 사용자로서, 게시글 목록을 보고 싶다
+- [x] `COMM-3` [Community] 사용자로서, 게시글 목록을 보고 싶다
   - **UseCase**: `GetPostListUseCase` - 게시글 목록 조회
   - **API**: `GET /community/posts?type={type}&page={page}`
   - **✅ 인수 조건**: 토픽/자유 필터링, 최신순 정렬, 댓글 수 표시

@@ -52,6 +52,35 @@ class MySQLPostRepository(PostRepositoryPort):
 
         return [self._to_domain(m) for m in post_models]
 
+    def count_all(self) -> int:
+        """전체 게시글 수를 반환한다"""
+        return self._db.query(PostModel).count()
+
+    def count_by_post_type(self, post_type: PostType) -> int:
+        """게시글 유형별 개수를 반환한다"""
+        return self._db.query(PostModel).filter(
+            PostModel.post_type == post_type.value
+        ).count()
+
+    def find_paginated(
+        self,
+        page: int,
+        size: int,
+        post_type: PostType | None = None,
+    ) -> list[Post]:
+        """페이지네이션된 게시글 목록을 조회한다"""
+        query = self._db.query(PostModel)
+
+        if post_type:
+            query = query.filter(PostModel.post_type == post_type.value)
+
+        offset = (page - 1) * size
+        post_models = query.order_by(
+            PostModel.created_at.desc()
+        ).offset(offset).limit(size).all()
+
+        return [self._to_domain(m) for m in post_models]
+
     def _to_domain(self, model: PostModel) -> Post:
         """ORM 모델을 도메인 객체로 변환한다"""
         post_type = PostType.TOPIC if model.post_type == "topic" else PostType.FREE
