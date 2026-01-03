@@ -13,7 +13,7 @@ from app.mbti_test.application.use_case.start_mbti_test_service import StartMBTI
 from app.mbti_test.application.use_case.answer_question_service import AnswerQuestionService
 from app.mbti_test.application.port.output.mbti_test_session_repository import MBTITestSessionRepositoryPort
 from app.mbti_test.application.port.ai_question_provider_port import AIQuestionProviderPort
-from app.mbti_test.adapter.output.mysql_mbti_test_session_repository import MySQLMBTITestSessionRepository
+from app.mbti_test.infrastructure.repository.mysql_mbti_test_session_repository import MySQLMBTITestSessionRepository
 from app.mbti_test.infrastructure.service.human_question_provider import HumanQuestionProvider
 from app.mbti_test.adapter.output.openai_ai_question_provider import create_openai_question_provider_from_settings
 from app.mbti_test.adapter.output.mysql_user_repository import MySQLUserRepository
