@@ -9,6 +9,7 @@ from app.shared.vo.mbti import MBTI
 from app.match.domain.match_ticket import MatchTicket
 from app.match.application.port.output.match_queue_port import MatchQueuePort
 from app.match.application.port.output.match_state_port import MatchStatePort, MatchState
+from app.user.application.port.block_repository_port import BlockRepositoryPort
 
 
 class MatchUseCase:
@@ -19,11 +20,12 @@ class MatchUseCase:
         self,
         match_queue_port: MatchQueuePort,
         chat_room_port: ChatRoomPort,
+        block_repository: BlockRepositoryPort,
         match_state_port: Optional[MatchStatePort] = None,
         match_notification_port: Optional[MatchNotificationPort] = None,
     ):
         self.match_queue = match_queue_port
-        self.match_service = MatchService(match_queue_port)
+        self.match_service = MatchService(match_queue_port, block_repository)
         self.chat_room_port = chat_room_port
         self.match_state = match_state_port
         self.match_notification_port = match_notification_port

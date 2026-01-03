@@ -1,21 +1,26 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
+from uuid import uuid4
 
 from app.chat.application.use_case.get_chat_history_use_case import GetChatHistoryUseCase
 from app.chat.application.use_case.get_my_chat_rooms_use_case import GetMyChatRoomsUseCase
 from app.chat.application.use_case.mark_chat_room_as_read_use_case import MarkChatRoomAsReadUseCase
 from app.chat.application.use_case.leave_chat_room_use_case import LeaveChatRoomUseCase
 from app.chat.application.use_case.report_user_use_case import ReportUserUseCase
+from app.chat.application.use_case.rate_user_use_case import RateUserUseCase
 from app.chat.application.port.chat_message_repository_port import ChatMessageRepositoryPort
 from app.chat.application.port.chat_room_repository_port import ChatRoomRepositoryPort
 from app.chat.application.port.report_repository_port import ReportRepositoryPort
+from app.chat.application.port.rating_repository_port import RatingRepositoryPort
 from app.chat.infrastructure.repository.mysql_chat_message_repository import MySQLChatMessageRepository
 from app.chat.infrastructure.repository.mysql_chat_room_repository import MySQLChatRoomRepository
 from app.chat.infrastructure.repository.mysql_report_repository import MySQLReportRepository
+from app.chat.infrastructure.repository.mysql_rating_repository import MySQLRatingRepository
 from app.chat.domain.report import ReportReason
+from app.chat.application.dto.rate_user_request import RateUserRequest
 from config.database import get_db
 
 chat_router = APIRouter()
@@ -34,6 +39,11 @@ def get_chat_room_repository(db: Session = Depends(get_db)) -> ChatRoomRepositor
 def get_report_repository(db: Session = Depends(get_db)) -> ReportRepositoryPort:
     """Report Repository 의존성 주입"""
     return MySQLReportRepository(db)
+
+
+def get_rating_repository(db: Session = Depends(get_db)) -> RatingRepositoryPort:
+    """Rating Repository 의존성 주입"""
+    return MySQLRatingRepository(db)
 
 
 class ChatMessageResponse(BaseModel):
@@ -208,3 +218,52 @@ def report_message(
         status="success",
         message="신고가 접수되었습니다"
     )
+
+
+class RateUserApiRequest(BaseModel):
+    rater_id: str
+    rated_user_id: str
+    score: int
+    feedback: Optional[str] = None
+
+
+@chat_router.post("/chat/{room_id}/rate")
+def rate_user_in_chat(
+    room_id: str,
+    request: RateUserApiRequest,
+    rating_repo: RatingRepositoryPort = Depends(get_rating_repository),
+    room_repo: ChatRoomRepositoryPort = Depends(get_chat_room_repository),
+):
+    """
+    채팅방의 다른 사용자를 평가한다.
+
+    - room_id: 채팅방 ID
+    - rater_id: 평가자 ID
+    - rated_user_id: 피평가자 ID
+    - score: 1-5점
+    - feedback: 선택적 피드백
+    """
+    # Check if both users are actually in the room
+    room = room_repo.find_by_id(room_id)
+    if not room or not {request.rater_id, request.rated_user_id}.issubset({room.user1_id, room.user2_id}):
+        raise HTTPException(status_code=404, detail="채팅방을 찾을 수 없거나 사용자가 채팅방에 속해있지 않습니다.")
+
+    if request.rater_id == request.rated_user_id:
+        raise HTTPException(status_code=400, detail="자기 자신을 평가할 수 없습니다.")
+
+    use_case = RateUserUseCase(rating_repo=rating_repo, uuid_generator=uuid4)
+
+    use_case_request = RateUserRequest(
+        rater_id=request.rater_id,
+        rated_user_id=request.rated_user_id,
+        room_id=room_id,
+        score=request.score,
+        feedback=request.feedback
+    )
+
+    try:
+        use_case.execute(use_case_request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return {"status": "success", "message": "평가가 성공적으로 제출되었습니다."}

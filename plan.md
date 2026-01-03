@@ -262,15 +262,16 @@ Person C,D ─→ 버그 픽스, UX 개선
   - **Domain**: `Report` (id, reporter_id, reported_user_id, room_id, message_id, reasons, created_at)
   - **UseCase**: `ReportUserUseCase` - 메시지 신고
   - **API**: `POST /chat/messages/{message_id}/report` → 신고 접수
-  - **✅ 인수 조건**: 여러 신고 사유 선택 가능, 중복 신고 방지, 관리자 검토용 DB 저장
+  - **✅ 인수 조건**: 여러 신고 사유 선택 가능,
+  - 중복 신고 방지, 관리자 검토용 DB 저장
 
-- [ ] `CHAT-7` [Chat] 사용자로서, 특정 유저를 차단하고 싶다
+- [x] `CHAT-7` [Chat] 사용자로서, 특정 유저를 차단하고 싶다
   - **Domain**: `Block` (id, blocker_id, blocked_user_id, created_at)
   - **UseCase**: `BlockUserUseCase` - 유저 차단
   - **API**: `POST /user/{user_id}/block` → 유저 차단
   - **✅ 인수 조건**: 차단한 유저와 매칭 안 됨, 기존 채팅방 비활성화
 
-- [ ] `CHAT-8` [Chat] 사용자로서, 채팅이 끝난 후 상대방을 평가하고 싶다
+- [x] `CHAT-8` [Chat] 사용자로서, 채팅이 끝난 후 상대방을 평가하고 싶다
   - **Domain**: `Rating` (id, rater_id, rated_user_id, room_id, score, feedback, created_at)
   - **UseCase**: `RateUserUseCase` - 상대 평가
   - **API**: `POST /chat/{room_id}/rate` → 평가 제출

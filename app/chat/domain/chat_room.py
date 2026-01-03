@@ -64,3 +64,7 @@ class ChatRoom:
                 self.status = "left_by_user2"
         else:
             raise ValueError(f"User {user_id} is not a participant of this chat room")
+
+    def deactivate_by_block(self) -> None:
+        """차단에 의해 채팅방을 비활성화한다"""
+        self.status = "blocked"
