@@ -65,12 +65,19 @@ class ChatClientAdapter(ChatRoomPort):
             if db:
                 db.close()
     async def are_users_partners(self, user1_id: str, user2_id: str) -> bool:
+        """
+        두 유저가 현재 활성 채팅방에서 대화 중인지 확인.
+        나간 방(left_by_user1, left_by_user2, closed, blocked)은 제외하여 재매칭 가능하도록 함.
+        """
         db = None
         try:
             db = get_db_session()
             chat_repo = MySQLChatRoomRepository(db)
             existing_room = chat_repo.find_by_users(user1_id, user2_id)
-            return existing_room is not None
+            # active 상태인 방만 중복으로 처리
+            if existing_room is None:
+                return False
+            return existing_room.status == "active"
         except Exception as e:
             logger.error(f"[Chat Integration] Failed to check partnership for {user1_id}, {user2_id}: {e}")
             # 에러 발생 시 안전하게 처리 (매칭을 막지 않도록 False 반환)
