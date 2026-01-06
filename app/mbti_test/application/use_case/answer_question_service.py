@@ -155,7 +155,9 @@ class AnswerQuestionService(AnswerQuestionUseCase):
             return AnswerQuestionResponse(
                 question_number=current_index,
                 total_questions=TOTAL_QUESTION_COUNT,
-                next_question=None,
+                next_question=MBTIMessage(
+                    role=MessageRole.ASSISTANT, content="", source=MessageSource.AI
+                ),
                 is_completed=True,
                 analysis_result=analysis_result,
                 partial_analysis_result=partial_analysis_result,

@@ -18,6 +18,23 @@ class MySQLUserRepository(UserRepositoryPort):
     def __init__(self, db: Session) -> None:
         self._db = db
 
+    def find_by_id(self, user_id: uuid.UUID) -> Any | None:
+        """
+        User 모델이 있으면 id로 조회하고, 없으면 no-op.
+        """
+        UserModel = self._try_import_user_model()
+        if UserModel is None:
+            return None
+
+        user = self._db.get(UserModel, str(user_id))
+        if user is None:
+            try:
+                user = self._db.get(UserModel, user_id)
+            except Exception:
+                user = None
+        
+        return user
+
     def update_mbti(self, user_id: uuid.UUID, mbti: str) -> None:
         """
         User 모델이 있으면 mbti를 업데이트하고, 없으면 no-op.

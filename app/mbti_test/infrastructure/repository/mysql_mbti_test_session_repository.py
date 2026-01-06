@@ -23,18 +23,26 @@ class MySQLMBTITestSessionRepository(MBTITestSessionRepositoryPort):
                 id=str(session.id),
                 user_id=str(session.user_id),
                 status=session.status.value,
-                answers=session.answers,
+                answers=[turn.__dict__ for turn in session.turns],
                 greeting_completed=session.greeting_completed,
             )
             self.db.add(model)
         else:
             model.status = session.status.value
-            model.answers = session.answers
+            model.answers = [turn.__dict__ for turn in session.turns]
             model.greeting_completed = session.greeting_completed
 
         self.db.commit()
         self.db.refresh(model)
         return session
+
+    def delete(self, session: MBTITestSession):
+        model = self.db.query(MBTITestSessionModel).filter(
+            MBTITestSessionModel.id == str(session.id)
+        ).first()
+        if model:
+            self.db.delete(model)
+            self.db.commit()
 
     def find_by_id(self, session_id: uuid.UUID) -> MBTITestSession | None:
         model = self.db.query(MBTITestSessionModel).filter(
@@ -43,6 +51,10 @@ class MySQLMBTITestSessionRepository(MBTITestSessionRepositoryPort):
 
         if model is None:
             return None
+
+        from app.mbti_test.infrastructure.service.human_question_provider import HumanQuestionProvider
+        human_question_provider = HumanQuestionProvider()
+        selected_human_questions = human_question_provider.select_random_questions(seed=str(model.id))
 
         # Reconstruct turns from answers
         turns = []
@@ -64,17 +76,59 @@ class MySQLMBTITestSessionRepository(MBTITestSessionRepositoryPort):
             status=TestStatus(model.status),
             created_at=model.created_at,
             turns=turns,
+            selected_human_questions=selected_human_questions,
             greeting_completed=model.greeting_completed,
+            current_question_index=len(turns)
         )
 
-    def add_answer(self, session_id: uuid.UUID, answer: dict) -> None:
+
+    def find_by_user_id_and_status(self, user_id: str, status: str) -> MBTITestSession | None:
+        model = self.db.query(MBTITestSessionModel).filter(
+            MBTITestSessionModel.user_id == user_id,
+            MBTITestSessionModel.status == status
+        ).first()
+
+        if model is None:
+            return None
+
+        from app.mbti_test.infrastructure.service.human_question_provider import HumanQuestionProvider
+        human_question_provider = HumanQuestionProvider()
+        selected_human_questions = human_question_provider.select_random_questions(seed=str(model.id))
+
+        # Reconstruct turns from answers
+        turns = []
+        for i, answer in enumerate(model.answers or []):
+            turns.append(Turn(
+                turn_number=i + 1,
+                question=answer.get("question", ""),
+                answer=answer.get("content", ""),
+                dimension=answer.get("dimension", ""),
+                scores=answer.get("scores", {}),
+                side=answer.get("side", ""),
+                score=answer.get("score", 0),
+            ))
+
+        return MBTITestSession(
+            id=uuid.UUID(model.id),
+            user_id=uuid.UUID(model.user_id),
+            test_type=TestType.HUMAN,
+            status=TestStatus(model.status),
+            created_at=model.created_at,
+            turns=turns,
+            selected_human_questions=selected_human_questions,
+            greeting_completed=model.greeting_completed,
+            current_question_index=len(turns)
+        )
+
+
+    def add_answer(self, session_id: uuid.UUID, turn: Turn) -> None:
         model = self.db.query(MBTITestSessionModel).filter(
             MBTITestSessionModel.id == str(session_id)
         ).first()
 
         if model:
             answers = list(model.answers or [])
-            answers.append(answer)
+            answers.append(turn.__dict__)
             model.answers = answers
             self.db.commit()
 
@@ -100,7 +154,7 @@ class MySQLMBTITestSessionRepository(MBTITestSessionRepositoryPort):
             id=model.id,
             user_id=model.user_id,
             status=status,
-            answers=list(model.answers or []),
+            turns=[Turn(**turn) for turn in (model.answers or [])],
             result=result,
         )
 

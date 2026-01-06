@@ -1,17 +1,19 @@
-from __future__ import annotations
-
-import uuid
 from abc import ABC, abstractmethod
+import uuid
+from typing import Any
 
 
 class UserRepositoryPort(ABC):
     """
-    왜 필요?
-    - MBTI-4에서 결과 확정 후 User.mbti를 업데이트해야 하는데,
-      UseCase가 DB/ORM을 몰라야 하므로 인터페이스로 분리한다.
+    User 리포지토리 포트.
     """
 
     @abstractmethod
+    def find_by_id(self, user_id: uuid.UUID) -> Any | None:
+        pass
+
+    @abstractmethod
     def update_mbti(self, user_id: uuid.UUID, mbti: str) -> None:
-        """MBTI-4 결과 확정 직후 사용자 프로필(User)에 mbti를 반영할 때 호출된다."""
+        """MBTI-4 결과 분석 후 사용자의 MBTI를 업데이트한다."""
         raise NotImplementedError
+

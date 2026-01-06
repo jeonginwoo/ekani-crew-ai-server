@@ -29,6 +29,12 @@ from app.mbti_test.domain.surprise_answer import MBTIDimension, SurpriseAnswer
 from app.mbti_test.adapter.output.mysql_surprise_answer_repository import MySQLSurpriseAnswerRepository
 from app.mbti_test.application.use_case.adjust_mbti_usecase import AdjustMBTIUseCase
 
+from app.mbti_test.application.use_case.find_in_progress_test_use_case import FindInProgressTestUseCase
+from app.mbti_test.application.use_case.delete_in_progress_test_use_case import DeleteInProgressTestUseCase
+from app.mbti_test.application.use_case.resume_test_use_case import ResumeTestUseCase
+from app.mbti_test.domain.mbti_test_session import TestType
+
+
 mbti_router = APIRouter()
 
 def get_db():
@@ -57,6 +63,28 @@ def get_calculate_final_mbti_usecase_mysql(
         user_repo=MySQLUserRepository(db=db),
         required_answers=12,  # 필요 시 24로 조정
     )
+    
+def get_find_in_progress_use_case(
+    session_repository: MBTITestSessionRepositoryPort = Depends(get_session_repository),
+) -> FindInProgressTestUseCase:
+    return FindInProgressTestUseCase(session_repository)
+
+def get_delete_in_progress_use_case(
+    session_repository: MBTITestSessionRepositoryPort = Depends(get_session_repository),
+) -> DeleteInProgressTestUseCase:
+    return DeleteInProgressTestUseCase(session_repository)
+
+def get_resume_test_use_case(
+    session_repository: MBTITestSessionRepositoryPort = Depends(get_session_repository),
+    human_question_provider: HumanQuestionProvider = Depends(get_human_question_provider),
+    ai_question_provider: AIQuestionProviderPort = Depends(get_ai_question_provider),
+) -> ResumeTestUseCase:
+    return ResumeTestUseCase(
+        session_repository=session_repository,
+        human_question_provider=human_question_provider,
+        ai_question_provider=ai_question_provider,
+    )
+
 class SurpriseAnswerRequest(BaseModel):
     question_id: str = Field(..., min_length=1, max_length=64)
     answer_text: str = Field(..., min_length=1, max_length=2000)
@@ -80,16 +108,68 @@ class MBTIResultResponse(BaseModel):
     dimension_scores: Dict[str, int]
     timestamp: str
 
+@mbti_router.post("/status")
+async def get_mbti_test_status(
+    user_id: str = Depends(get_current_user_id),
+    resume_use_case: ResumeTestUseCase = Depends(get_resume_test_use_case),
+    user_repository: UserRepositoryPort = Depends(get_user_repository),
+):
+    resume_data = resume_use_case.execute(user_id)
+    if resume_data:
+        user = user_repository.find_by_id(uuid.UUID(user_id))
+        session_dict = jsonable_encoder(resume_data.session)
+        session_dict["user"] = jsonable_encoder(user)
+        return {
+            "status": "in_progress",
+            "session": session_dict,
+            "next_question": jsonable_encoder(resume_data.next_question),
+        }
+    else:
+        return {"status": "no_test_found"}
+
+
 @mbti_router.post("/start")
 async def start_mbti_test(
     user_id: str = Depends(get_current_user_id),
     session_repository: MBTITestSessionRepositoryPort = Depends(get_session_repository),
+    user_repository: UserRepositoryPort = Depends(get_user_repository),
     human_question_provider: HumanQuestionProvider = Depends(get_human_question_provider),
+    delete_use_case: DeleteInProgressTestUseCase = Depends(get_delete_in_progress_use_case),
+    find_in_progress_use_case: FindInProgressTestUseCase = Depends(get_find_in_progress_use_case),
+    test_type: TestType = TestType.HUMAN,
+    force_new: bool = False,
 ):
+    if force_new:
+        delete_use_case.execute(user_id)
+    else:
+        existing_session = find_in_progress_use_case.execute(user_id)
+        if existing_session:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An in-progress test already exists for this user. Use force_new=True to override.",
+            )
+
     use_case = StartMBTITestService(session_repository, human_question_provider)
-    command = StartMBTITestCommand(user_id=uuid.UUID(user_id))
+    command = StartMBTITestCommand(user_id=uuid.UUID(user_id), test_type=test_type)
     result = use_case.execute(command)
-    return jsonable_encoder({"session": result.session, "first_question": result.first_question})
+
+    user = user_repository.find_by_id(uuid.UUID(user_id))
+    session_dict = jsonable_encoder(result.session)
+    session_dict["user"] = jsonable_encoder(user)
+
+    return {
+        "status": "new_test_started",
+        "session": session_dict,
+        "first_question": jsonable_encoder(result.first_question),
+    }
+
+@mbti_router.delete("/session")
+async def delete_in_progress_mbti_test(
+    user_id: str = Depends(get_current_user_id),
+    delete_use_case: DeleteInProgressTestUseCase = Depends(get_delete_in_progress_use_case),
+):
+    delete_use_case.execute(user_id)
+    return {"status": "ok"}
 
 @mbti_router.post("/{mbti_session_id}/answer")
 async def answer_question(
