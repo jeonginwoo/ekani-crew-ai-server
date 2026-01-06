@@ -16,7 +16,7 @@ class FakeBlockRepository(BlockRepositoryPort):
         """id로 차단을 조회한다"""
         return self._blocks.get(block_id)
 
-    def find_by_blocker_and_blocked(self, blocker_id: str, blocked_user_id: str) -> Block | None:
+    async def find_by_blocker_and_blocked(self, blocker_id: str, blocked_user_id: str) -> Block | None:
         """특정 차단 관계를 조회한다"""
         for block in self._blocks.values():
             if block.blocker_id == blocker_id and block.blocked_user_id == blocked_user_id:

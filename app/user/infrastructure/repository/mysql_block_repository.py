@@ -20,7 +20,7 @@ class MySQLBlockRepository(BlockRepositoryPort):
         block_model = self._db.query(BlockModel).filter(BlockModel.id == block_id).first()
         return self._to_domain(block_model) if block_model else None
 
-    def find_by_blocker_and_blocked(self, blocker_id: str, blocked_user_id: str) -> Block | None:
+    async def find_by_blocker_and_blocked(self, blocker_id: str, blocked_user_id: str) -> Block | None:
         """특정 차단 관계를 조회한다"""
         block_model = self._db.query(BlockModel).filter(
             BlockModel.blocker_id == blocker_id,

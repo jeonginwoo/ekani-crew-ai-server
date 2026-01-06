@@ -16,7 +16,7 @@ class BlockRepositoryPort(ABC):
         pass
 
     @abstractmethod
-    def find_by_blocker_and_blocked(self, blocker_id: str, blocked_user_id: str) -> Block | None:
+    async def find_by_blocker_and_blocked(self, blocker_id: str, blocked_user_id: str) -> Block | None:
         """특정 차단 관계를 조회한다 (중복 차단 체크용)"""
         pass
 
