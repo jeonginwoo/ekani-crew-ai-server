@@ -180,6 +180,24 @@ Person C,D ─→ 버그 픽스, UX 개선
 
 ---
 
+##### 🔄 테스트 재개 및 재시작 (하민, 대호 협업)
+
+- [x] `MBTI-7` [MBTI] 사용자로서, 중단했던 MBTI 테스트를 이어서 하거나 처음부터 다시 시작하고 싶다
+  - **Domain 확장**: `MBTITestSession.status` (in_progress, completed, abandoned)
+  - **UseCase**: `FindInProgressTestUseCase` - 진행 중인 테스트 세션 조회
+  - **UseCase**: `ResumeTestUseCase` - 중단된 테스트 이어서 진행
+  - **UseCase**: `DeleteInProgressTestUseCase` - 진행 중인 테스트 삭제 (재시작용)
+  - **API**: `POST /mbti-test/status` → 진행 중인 테스트 세션 정보 (질문 번호, 응답 내역, 다음 질문)
+  - **API**: `DELETE /mbti-test/session` → 진행 중인 테스트 삭제
+  - **API**: `POST /mbti-test/start?force_new=true` → 진행 중인 테스트 삭제 후 새로 시작
+  - **✅ 인수 조건**:
+    - 진행 중인 테스트가 있으면 세션 정보 반환 (몇 번째 질문까지 답했는지)
+    - 이어서 하기 선택 시, 다음 질문부터 진행
+    - 처음부터 하기 선택 시, 기존 세션 삭제 후 새 세션 시작
+    - 이미 완료된 테스트는 in-progress 목록에서 제외
+
+---
+
 #### Matching Domain (Team Match)
 
 - [x] `MATCH-1` [Matching] 사용자로서, 매칭 대기열에 등록하고 싶다
