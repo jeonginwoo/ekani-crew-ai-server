@@ -153,8 +153,9 @@ class OpenAIMessageConverter(MessageConverterPort):
             strategies.append("👉 **수신자가 T형 (사고)**: 감정적인 서술은 줄이고, **'원인과 결과(In-Ga)'**, **'핵심 용건'**, **'객관적 근거'** 위주로 드라이하게 정리해.")
 
         # 3. 생활 양식 및 업무 방식
+        print(receiver.lifestyle)
         if receiver.lifestyle == 'P':
-            strategies.append("👉 **수신자가 P형 (인식)**: 분 단위 계획표는 P에게 '읽기 싫은 텍스트'일 뿐이야. **중간 과정(기상, 씻기, 이동 등)은 싹 다 지워버려.**")
+            strategies.append("👉 **수신자가 P형 (인식)**: 빽빽한 계획표는 P에게 '읽기 싫은 텍스트'일 뿐이야. 모든 계획을 다 전달할 필요 없고 핵심만 이해할 수 있으면 돼. **중간 과정(기상, 씻기, 이동 등)은 싹 다 지워버려.**")
             strategies.append("대신 다음 두 가지 중 하나로 변환해:")
             strategies.append("1. **선택권 부여**: 'A, B, C 중에 어디가 젤 땡겨? 하나만 골라 대충 가자.'")
             strategies.append("2. **단순 통보**: '복잡한 건 내가 챙길 테니까, 넌 12시까지 OO으로 몸만 와.'")
