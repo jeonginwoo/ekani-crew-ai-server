@@ -165,18 +165,22 @@ Person C,D ─→ 버그 픽스, UX 개선
 
 ---
 
-##### ⚡ 돌발 질문 (MBTI 보정) - 앱 사용 중 간헐적 등장
+##### 🔄 테스트 재개 및 재시작 (하민, 대호 협업)
 
-- [ ] `MBTI-5` [MBTI] 사용자로서, 앱 사용 중 AI가 만든 예상치 못한 질문을 받고 싶다
-  - **Adapter**: `AISurpriseProvider` (gpt-4o-mini)
-  - **Prompt**: 기존 MBTI + 사용 패턴 기반 돌발 질문 생성
-  - **API**: `GET /mbti/surprise?source=ai` → AI 돌발 질문
-  - **✅ 인수 조건**: 간헐적 노출, AI가 만든 맥락 기반 질문
-
-- [ ] `MBTI-6` [MBTI] 사용자로서, 돌발 질문 응답으로 MBTI가 보정되길 원한다
-  - **UseCase**: `AdjustMBTIUseCase` - 돌발 응답 기반 MBTI 보정
-  - **API**: `POST /mbti/surprise/answer` → MBTI 보정 결과
-  - **✅ 인수 조건**: 응답 분석 후 MBTI 보정 (예: ESTJ → ISTJ)
+- [x] `MBTI-5` [MBTI] 사용자로서, 중단했던 MBTI 테스트를 이어서 하거나 처음부터 다시 시작하고 싶다
+  - **Domain 확장**: `MBTITestSession.status` (in_progress, completed, abandoned)
+  - **UseCase**: `FindInProgressTestUseCase` - 진행 중인 테스트 세션 조회
+  - **UseCase**: `ResumeTestUseCase` - 중단된 테스트 이어서 진행
+  - **UseCase**: `DeleteInProgressTestUseCase` - 진행 중인 테스트 삭제 (재시작용)
+  - **API**: `POST /mbti-test/resume` → 이어하기 (진행 중인 테스트 계속, 다음 질문 반환)
+  - **API**: `POST /mbti-test/restart` → 새로하기 (기존 세션 삭제 후 새 테스트 시작)
+  - **API**: `POST /mbti-test/status` → 진행 중인 테스트 조회 (deprecated, /resume 사용 권장)
+  - **API**: `DELETE /mbti-test/session` → 진행 중인 테스트 삭제
+  - **✅ 인수 조건**:
+    - "이어하기" 버튼: 진행 중인 테스트가 있으면 세션 정보 반환 및 다음 질문부터 진행
+    - "새로하기" 버튼: 기존 세션 삭제 후 새 세션 시작 (첫 질문부터)
+    - 진행 중인 테스트가 없으면 404 반환
+    - 이미 완료된 테스트는 in-progress 목록에서 제외
 
 ---
 

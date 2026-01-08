@@ -163,6 +163,64 @@ async def start_mbti_test(
         "first_question": jsonable_encoder(result.first_question),
     }
 
+@mbti_router.post("/resume")
+async def resume_mbti_test(
+    user_id: str = Depends(get_current_user_id),
+    resume_use_case: ResumeTestUseCase = Depends(get_resume_test_use_case),
+    user_repository: UserRepositoryPort = Depends(get_user_repository),
+):
+    """
+    이어하기: 진행 중인 MBTI 테스트를 이어서 진행
+    """
+    resume_data = resume_use_case.execute(user_id)
+    if not resume_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="진행 중인 테스트를 찾을 수 없습니다."
+        )
+
+    user = user_repository.find_by_id(uuid.UUID(user_id))
+    session_dict = jsonable_encoder(resume_data.session)
+    session_dict["user"] = jsonable_encoder(user)
+
+    return {
+        "status": "resumed",
+        "session": session_dict,
+        "next_question": jsonable_encoder(resume_data.next_question),
+    }
+
+
+@mbti_router.post("/restart")
+async def restart_mbti_test(
+    user_id: str = Depends(get_current_user_id),
+    session_repository: MBTITestSessionRepositoryPort = Depends(get_session_repository),
+    user_repository: UserRepositoryPort = Depends(get_user_repository),
+    human_question_provider: HumanQuestionProvider = Depends(get_human_question_provider),
+    delete_use_case: DeleteInProgressTestUseCase = Depends(get_delete_in_progress_use_case),
+    test_type: TestType = TestType.HUMAN,
+):
+    """
+    새로하기: 기존 테스트를 삭제하고 새로 시작
+    """
+    # 기존 진행 중인 테스트 삭제
+    delete_use_case.execute(user_id)
+
+    # 새 테스트 시작
+    use_case = StartMBTITestService(session_repository, human_question_provider)
+    command = StartMBTITestCommand(user_id=uuid.UUID(user_id), test_type=test_type)
+    result = use_case.execute(command)
+
+    user = user_repository.find_by_id(uuid.UUID(user_id))
+    session_dict = jsonable_encoder(result.session)
+    session_dict["user"] = jsonable_encoder(user)
+
+    return {
+        "status": "restarted",
+        "session": session_dict,
+        "first_question": jsonable_encoder(result.first_question),
+    }
+
+
 @mbti_router.delete("/session")
 async def delete_in_progress_mbti_test(
     user_id: str = Depends(get_current_user_id),

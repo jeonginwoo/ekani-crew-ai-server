@@ -53,7 +53,7 @@ class MBTITestSession:
         """하위 호환성을 위한 답변 리스트 (CalculateFinalMBTIUseCase 호환)"""
         return [
             {
-                "content": turn.answer,
+                "answer": turn.answer,
                 "dimension": turn.dimension,
                 "side": turn.side,
                 "score": turn.score,
