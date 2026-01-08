@@ -234,7 +234,7 @@ class OpenAIQuestionProvider(AIQuestionProviderPort):
                 {"role": "user", "content": user_prompt},
             ],
             response_format={"type": "json_object"},
-            temperature=0.0,
+            temperature=0.5,
         )
 
         content = resp.choices[0].message.content
