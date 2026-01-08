@@ -43,6 +43,9 @@ class MBTITestSessionModel(Base):
     result_mbti: Mapped[str | None] = mapped_column(String(8), nullable=True)
     result_dimension_scores: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     result_timestamp: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # 다음 턴에 사용될 질문 (아직 답변 받지 않음)
+    pending_question: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     pending_question_dimension: Mapped[str | None] = mapped_column(String(8), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
