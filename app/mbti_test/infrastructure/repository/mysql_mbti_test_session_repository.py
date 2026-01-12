@@ -249,7 +249,7 @@ class MySQLMBTITestSessionRepository(MBTITestSessionRepositoryPort):
             id=model.id,
             user_id=model.user_id,
             status=status,
-            turns=turns,
+            answers=list(model.answers or []),
             result=result,
         )
 

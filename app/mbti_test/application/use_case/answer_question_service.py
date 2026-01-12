@@ -93,11 +93,12 @@ class AnswerQuestionService(AnswerQuestionUseCase):
         else:
             # AI phase: AI 기반 분석 (맥락 포함)
             history = self._build_chat_history(session)
+            target_dim = (session.pending_question_dimension or "SN").replace("/", "")
             analyze_command = AnalyzeAnswerCommand(
                 question=session.pending_question or "",
                 answer=command.answer,
                 history=history,
-                target_dimension=session.pending_question_dimension or "SN"
+                target_dimension=target_dim,
             )
             ai_analysis = self._ai_question_provider.analyze_answer(analyze_command)
             dimension = ai_analysis.dimension or analyze_command.target_dimension
@@ -171,6 +172,9 @@ class AnswerQuestionService(AnswerQuestionUseCase):
             )
         else:
             # AI phase (questions 12-23)
+            def _normalize_question(text: str) -> str:
+                return " ".join(text.split()).strip().lower()
+
             history = self._build_chat_history(session)
             ai_turn = current_index - HUMAN_QUESTION_COUNT + 1  # 1-12 for AI
 
@@ -181,22 +185,41 @@ class AnswerQuestionService(AnswerQuestionUseCase):
                 question_mode="normal",
             )
 
-            ai_response = self._ai_question_provider.generate_questions(ai_command)
+            recent_questions = {_normalize_question(t.question) for t in session.turns[-6:]}
 
-            if ai_response.questions:
-                q = ai_response.questions[0]
+            picked_question = None
+            last_ai_response = None
+            for _ in range(3):
+                ai_response = self._ai_question_provider.generate_questions(ai_command)
+                last_ai_response = ai_response
+                if not ai_response.questions:
+                    continue
+
+                for candidate in ai_response.questions:
+                    if _normalize_question(candidate.text) not in recent_questions:
+                        picked_question = candidate
+                        break
+
+                if picked_question:
+                    break
+
+            if picked_question:
                 next_question = MBTIMessage(
                     role=MessageRole.ASSISTANT,
-                    content=q.text,
+                    content=picked_question.text,
                     source=MessageSource.AI,
                 )
-                # ✅ 차원 보존
-                session.pending_question_dimension = (q.target_dimensions or [None])[0]
+                raw_dim = (picked_question.target_dimensions or [None])[0]
+                session.pending_question_dimension = raw_dim.replace("/", "") if raw_dim else None
             else:
-                # Fallback if AI fails
+                # Fallback if AI fails or only duplicates returned
+                fallback_text = "다음 질문입니다: 당신의 성격을 한 단어로 표현한다면?"
+                if last_ai_response and last_ai_response.questions:
+                    fallback_text = last_ai_response.questions[0].text or fallback_text
+
                 next_question = MBTIMessage(
                     role=MessageRole.ASSISTANT,
-                    content="다음 질문입니다: 당신의 성격을 한 단어로 표현한다면?",
+                    content=fallback_text,
                     source=MessageSource.AI,
                 )
 
